@@ -205,8 +205,8 @@ static inline void lcall(uint16_t segment, uint32_t offset) {
     segment
   };
  __asm__ __volatile__("lcall *(%%eax)"
-											:
-											:"a"(destination));
+                      :
+                      :"a"(destination));
   return;
 }
 
