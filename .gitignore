@@ -1,0 +1,7 @@
+*.bin
+*.BIN
+*.o
+bin/
+i386-pc-xbox/
+include/
+lib/
