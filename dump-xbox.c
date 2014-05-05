@@ -11,7 +11,6 @@
 #include <hal/fileio.h>
 
 #include "common/x86.h"
-#include "common/x86Types.h"
 
 
 void resetFlash(volatile uint8_t* flashRom) {
