@@ -11,6 +11,7 @@
 #include <hal/fileio.h>
 
 #include "common/x86.h"
+#include "common/pe.h"
 
 
 void resetFlash(volatile uint8_t* flashRom) {
@@ -68,7 +69,7 @@ bool dumpFile(const uint8_t* data, size_t size, const char* filename) {
   size_t offset = 0;
   while(size > 0) {
     size_t chunk = size>1024?1024:size;
-    size_t written = fwrite(&data[offset],1,chunk,f);
+    size_t written = fwrite(&data[offset],1,chunk,f); fflush(f);
     written = chunk; // Work around OpenXDK issue where it doesn't return the number of elements
     size -= written;
     offset += written;
@@ -163,6 +164,62 @@ void XBoxStartup(void) {
       *ptr++ = (uint16_t)value;
     }
     dumpFile(buffer,0x100,"eeprom.bin");
+  }
+
+  // Dump xboxkrnl.exe and its arguments
+  if (1) {  
+    // Dump the kernel image
+    {
+      void* kernelImage = (void*)0x80010000;
+      IMAGE_DOS_HEADER* kernelImageDosHeader = kernelImage;
+      IMAGE_NT_HEADERS* kernelImageHeader = (IMAGE_NT_HEADERS*)((uintptr_t)kernelImage+kernelImageDosHeader->e_lfanew);
+      IMAGE_FILE_HEADER* kernelImageFileHeader = &kernelImageHeader->FileHeader;
+      IMAGE_OPTIONAL_HEADER* kernelImageOptionalHeader = &kernelImageHeader->OptionalHeader;
+      // Print some information about data sections
+      uint32_t* kernelDataSectionInformation = (uint32_t*)kernelImageDosHeader->e_res2;
+      printf("xboxkrnl.exe: Uninitalized data section is 0x%X bytes\n",kernelDataSectionInformation[0]); fflush(stdout);
+      printf("xboxkrnl.exe: Initalized data section is 0x%X bytes at 0x%08X (Raw data at 0x%08X)\n",kernelDataSectionInformation[1],kernelDataSectionInformation[3],kernelDataSectionInformation[2]); fflush(stdout);
+      // Calculate the kernel size
+      size_t length = kernelImageOptionalHeader->SizeOfImage;
+      if (0) {
+        uint16_t sectionCount = kernelImageFileHeader->NumberOfSections;
+        // Navigate to section header of the last section (which should be INIT)
+        IMAGE_SECTION_HEADER* sectionHeaders = (IMAGE_SECTION_HEADER*)((uintptr_t)kernelImageOptionalHeader + kernelImageFileHeader->SizeOfOptionalHeader);
+        IMAGE_SECTION_HEADER* sectionHeader = &sectionHeaders[sectionCount-1];
+        // And calculate the actual length
+        printf("xboxkrnl.exe: Found '%.8s', virtual size: 0x%X (at 0x%08X), raw size: 0x%X\n",sectionHeader->Name,sectionHeader->Misc.VirtualSize,sectionHeader->VirtualAddress,sectionHeader->SizeOfRawData); fflush(stdout);
+        length = sectionHeader->VirtualAddress + sectionHeader->SizeOfRawData;
+        printf("xboxkrnl.exe: Length of 0x%X bytes reported, 0x%X bytes calculated\n",kernelImageOptionalHeader->SizeOfImage,length); fflush(stdout);
+      }
+      dumpFile(kernelImage,length,"xboxkrnl.exe");
+    }
+    // Dump keys which were passed to kernel
+    {  
+      uint8_t keys[16+16];
+      // EEPROM Key 
+      {
+        printf("keys.bin: EEPROM key: "); fflush(stdout);
+        unsigned int i;
+        for(i = 0; i < 16; i++) {
+          printf("%02X",XboxEEPROMKey[i]); fflush(stdout);
+        }
+        printf("\n"); fflush(stdout);
+        memcpy(&keys[0],XboxEEPROMKey,16);
+      }
+      // CERT key
+      {
+        uint8_t* XboxCERTKey = &XboxHDKey[-16]; // XboxCERTKey is just infront of XboxHDKey
+        printf("keys.bin: CERT key: "); fflush(stdout);
+        int i;
+        for(i = 0; i < 16; i++) {
+          printf("%02X",XboxCERTKey[i]); fflush(stdout);
+        }
+        printf("\n"); fflush(stdout);
+        memcpy(&keys[16],XboxCERTKey,16);
+      }
+      // Now dump them to file
+      dumpFile(keys,sizeof(keys),"keys.bin");
+    }
   }
 
   // Dump HDD stuff

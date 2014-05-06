@@ -37,6 +37,8 @@ transfer: default.xbe
 
 # Download dumped files from xbox
 get:
+	@wget -q -O xboxkrnl.exe ftp://xbox:xbox@$(XBOX):21$(XBOX_PATH)/xboxkrnl.exe
+	@wget -q -O keys.bin ftp://xbox:xbox@$(XBOX):21$(XBOX_PATH)/keys.bin
 	@wget -q -O flash.bin ftp://xbox:xbox@$(XBOX):21$(XBOX_PATH)/flash.bin
 	@wget -q -O eeprom.bin ftp://xbox:xbox@$(XBOX):21$(XBOX_PATH)/eeprom.bin
 	@wget -q -O hdd_0x0-0x3ff.bin ftp://xbox:xbox@$(XBOX):21$(XBOX_PATH)/hdd_0x0-0x3ff.bin
