@@ -1,6 +1,9 @@
 *.bin
 *.BIN
 *.o
+*.exe
+*.xbe
+*.txt
 bin/
 i386-pc-xbox/
 include/
