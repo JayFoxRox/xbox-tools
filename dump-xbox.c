@@ -108,6 +108,38 @@ void XBoxStartup(void) {
   // Keep track how many errors we produce..
   unsigned int errors = 0;
 
+  // Dump the hardware information to log
+  if (1) { 
+
+    // Dump generic details
+    IoOutputDword(0xCF8, 0x80000084);
+    size_t ramSize = IoInputDword(0xCFC);
+    printf("XBox: %i MB RAM\n",(ramSize+1) / (1024*1024)); fflush(stdout);
+  
+    // Dump MCPX details
+    IoOutputDword(0xCF8, 0x80000808);
+    uint32_t mcpxRevision = IoInputDword(0xCFC);
+    IoOutputDword(0xCF8, 0x80000880);
+    uint32_t mcpxRomEnable = IoInputDword(0xCFC);
+    bool mcpxX2 = mcpxRomEnable & 0x1000; //FIXME: Might just indicate DVT4
+    printf("MCPX: %s, Revision 0x%02X\n",mcpxX2?"X2":"X3",mcpxRevision & 0xFF); fflush(stdout);
+
+    //FIXME: We should also dump NV2A details for completeness
+
+    // Dump SMC details
+    char smcVersion[3];
+    HalWriteSMBusValue(0x20 /* SMC Write */, 0x01 /* Version seek */, TRUE, 0x01);
+    unsigned int i;
+    for(i = 0; i < 3; i++) {
+      HalReadSMBusValue(0x20 /* SMC Read */, 0x01 /* Version read */, TRUE, &smcVersion[i]);
+    }
+    printf("SMC: Version '%.3s'\n",smcVersion); fflush(stdout);
+    uint8_t smcAvPack;  
+    HalReadSMBusValue(0x20 /* SMC Read */, 0x04 /* AV Pack read */, TRUE, &smcAvPack);
+    printf("SMC: AV Pack 0x%02X\n",smcAvPack); fflush(stdout);
+
+  }  
+
   // Dump the flash
   if (1) { 
     // 0xFF000000 - 0xFFFFFFFF is flash
