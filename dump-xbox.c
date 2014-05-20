@@ -114,7 +114,7 @@ void XBoxStartup(void) {
     // Dump generic details
     IoOutputDword(0xCF8, 0x80000084);
     size_t ramSize = IoInputDword(0xCFC);
-    printf("XBox: %i MB RAM\n",(ramSize+1) / (1024*1024)); fflush(stdout);
+    printf("Xbox: %i MB RAM\n",(ramSize+1) / (1024*1024)); fflush(stdout);
   
     // Dump MCPX details
     IoOutputDword(0xCF8, 0x80000808);
@@ -128,7 +128,7 @@ void XBoxStartup(void) {
 
     // Dump SMC details
     char smcVersion[3];
-    HalWriteSMBusValue(0x20 /* SMC Write */, 0x01 /* Version seek */, TRUE, 0x01);
+    HalWriteSMBusValue(0x20 /* SMC Write */, 0x01 /* Version seek */, TRUE, 0);
     unsigned int i;
     for(i = 0; i < 3; i++) {
       HalReadSMBusValue(0x20 /* SMC Read */, 0x01 /* Version read */, TRUE, &smcVersion[i]);
