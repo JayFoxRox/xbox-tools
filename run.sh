@@ -22,6 +22,7 @@ level=0
 x2=0
 usb=0
 apitrace=0
+vogl=0
 dvd=""
 skip_animation=1
 fatal=0
@@ -47,6 +48,8 @@ while [ $# -ne 0 ]; do
     skip_animation=0
   elif [ "$1" == "usb" ]; then
     usb=1
+  elif [ "$1" == "vogl" ]; then
+    vogl=1
   elif [ "$1" == "apitrace" ]; then
     apitrace=1
 #  elif [ "$1" == "cachegrind" ]; then
@@ -90,8 +93,15 @@ if [ $sw_renderer -ne 0 ]; then
   export LIBGL_ALWAYS_SOFTWARE=1
 fi
 
+
+#FIXME: shouldn't be able to use vogl AND apitrace
 if [ $apitrace -ne 0 ]; then
   PREFIX="apitrace trace -a gl $PREFIX"
+fi
+
+if [ $vogl -ne 0 ]; then
+export VOGL_CMD_LINE="--vogl_tracefile vogl-trace.bin" # --vogl_debug  --vogl_pause"
+PREFIX="LD_PRELOAD=\"\$LD_PRELOAD:/usr/lib/libvogltrace64.so\""
 fi
 
 if [ $gdb -ne 0 ]; then
