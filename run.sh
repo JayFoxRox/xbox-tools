@@ -16,6 +16,7 @@ XQEMU_BIOS=Complex_4627.bin
 reset
 clear
 
+pause=0
 kvm=1
 gdb=0
 level=0
@@ -42,6 +43,8 @@ while [ $# -ne 0 ]; do
     kvm=0
   elif [ "$1" == "gdb" ]; then
     gdb=1
+  elif [ "$1" == "pause" ]; then
+    pause=1
   elif [ "$1" == "fatal" ]; then
     fatal=1
   elif [ "$1" == "logo" ]; then
@@ -105,7 +108,11 @@ PREFIX="LD_PRELOAD=\"\$LD_PRELOAD:/usr/lib/libvogltrace64.so\""
 fi
 
 if [ $gdb -ne 0 ]; then
-  SUFFIX="$SUFFIX -s -S"
+  SUFFIX="$SUFFIX -s"
+fi
+
+if [ $pause -ne 0 ]; then
+  SUFFIX="$SUFFIX -S"
 fi
 
 if [ $kvm -ne 0 ]; then
