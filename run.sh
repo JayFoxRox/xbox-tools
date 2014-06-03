@@ -159,8 +159,12 @@ else
     echo "Creating xiso.."
     #tmpdvd=$(mktemp -u)
     tmpdvd="/tmp/xqemu-dvd.xiso"
-    echo "extract-xiso -c \"$dvd\" \"$tmpdvd\""
-    eval extract-xiso -c \"$dvd\" \"$tmpdvd\"
+    echo "extract-xiso -c '$dvd' '$tmpdvd'"
+    eval "extract-xiso -c '$dvd' '$tmpdvd'"
+    if [ $? -ne 0 ]; then
+      echo "Could not create xiso. Stopping."
+      exit 1
+    fi
     dvd="$tmpdvd"
   fi
   if [ -f "$dvd" ]; then
