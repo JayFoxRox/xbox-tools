@@ -127,9 +127,20 @@ USB_PORT_P1="bus=usb-bus.1,port=3"
 USB_PORT_P2="?"
 USB_PORT_P3="?"
 USB_PORT_P4="bus=usb-bus.1,port=2"
+
+#	gamepad_1   ->   port 3
+#	gamepad_2   ->   port 4
+#	gamepad_3   ->   port 1
+#	gamepad_4   ->   port 2
+
 if [ $usb -ne 0 ]; then
   SUFFIX="$SUFFIX -usb -device usb-host,$USB_PORT_P1,vendorid=0x45e,productid=0x289"
 else
+#  SUFFIX="$SUFFIX -usb -device usb-hub,bus=usb-bus.1,port=1 -device usb-xbox-gamepad,$USB_PORT_P1"
+#  SUFFIX="$SUFFIX -usb -device usb-hub,bus=usb-bus.1,port=1 -device usb-hub,bus=usb-bus.1,port=1.1 -device usb-xbox-gamepad,bus=usb-bus.1,port=1.1.1"
+#  SUFFIX="$SUFFIX -usb -device usb-hub,bus=usb-bus.1,port=2 -device usb-hub,bus=usb-bus.1,port=1.2 -device usb-xbox-gamepad,bus=usb-bus.1,port=1.2.1"
+#  SUFFIX="$SUFFIX -usb -device usb-hub,bus=usb-bus.1,port=3 -device usb-hub,bus=usb-bus.1,port=3.1 -device usb-xbox-gamepad,bus=usb-bus.1,port=3.1.1"
+#  SUFFIX="$SUFFIX -usb -device usb-hub,bus=usb-bus.1,port=4 -device usb-hub,bus=usb-bus.1,port=1.4 -device usb-xbox-gamepad,bus=usb-bus.1,port=1.4.1"
   SUFFIX="$SUFFIX -usb -device usb-xbox-gamepad,$USB_PORT_P1"
 fi
 
