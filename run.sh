@@ -18,7 +18,8 @@ clear
 
 pause=0
 kvm=1
-gdb=0
+guest_gdb=0
+host_gdb=0
 level=0
 x2=0
 usb=0
@@ -41,8 +42,10 @@ while [ $# -ne 0 ]; do
     sw_renderer=1
   elif [ "$1" == "tcg" ]; then
     kvm=0
-  elif [ "$1" == "gdb" ]; then
-    gdb=1
+  elif [ "$1" == "guest-gdb" ]; then
+    guest_gdb=1
+  elif [ "$1" == "host-gdb" ]; then
+    host_gdb=1
   elif [ "$1" == "pause" ]; then
     pause=1
   elif [ "$1" == "fatal" ]; then
@@ -96,6 +99,9 @@ if [ $sw_renderer -ne 0 ]; then
   export LIBGL_ALWAYS_SOFTWARE=1
 fi
 
+if [ $host_gdb -ne 0 ]; then
+  PREFIX="gdb -ex 'handle SIGUSR1 noprint nostop pass' -ex 'handle SIGUSR2 noprint nostop pass' --args $PREFIX"
+fi
 
 #FIXME: shouldn't be able to use vogl AND apitrace
 if [ $apitrace -ne 0 ]; then
@@ -107,7 +113,7 @@ export VOGL_CMD_LINE="--vogl_tracefile vogl-trace.bin" # --vogl_debug  --vogl_pa
 PREFIX="LD_PRELOAD=\"\$LD_PRELOAD:/usr/lib/libvogltrace64.so\""
 fi
 
-if [ $gdb -ne 0 ]; then
+if [ $guest_gdb -ne 0 ]; then
   SUFFIX="$SUFFIX -s"
 fi
 
