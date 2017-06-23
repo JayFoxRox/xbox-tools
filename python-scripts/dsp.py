@@ -158,11 +158,11 @@ def dsp_status(dump_buffers = True):
 		if dump_buffers: #FIXME: Should only be done while the CPU is paused / no hw is accessing said buffer
 			channels = 2 if is_stereo else 1
 			in_sample_size = container_size_values[container_size]
-			fmt = 0x0069 if container_size == 2 else 0x0001
+			fmt = 0x0011 if container_size == 2 else 0x0001
 			wav = export_wav("buf" + format(psl_start_ba, '08X') + ".wav", channels, in_sample_size, freq, fmt)
 
 			samples = ebo + 1
-			if fmt == 0x0069: # Check for ADPCM
+			if fmt == 0x0011: # Check for ADPCM
 				#FIXME: Is this correct?
 				#FIXME: Rounding issues?
 				block_size =  0x24 * channels
