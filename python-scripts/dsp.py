@@ -174,7 +174,7 @@ def dsp_status():
 				samples -= len(data) // (in_sample_size * channels)
 				wav.writeframes(data)
 				if True:
-					psl_start_ba_offset += 0x1000
+					psl_start_ba_offset += in_page
 				else:
 					#FIXME: Weird.. why isn't this correct?!
 					psl_start_ba_offset = 0
