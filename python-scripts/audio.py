@@ -1,4 +1,7 @@
-import wave
+import sys
+if not "" in sys.path:
+	sys.path += [""]
+import better_wave
 
 def ac97_read_u8(address):
 	return read_u8(0xFEC00000 + address)
@@ -15,35 +18,14 @@ def ac97_write_u32(address, value):
 	write_u32(0xFEC00000 + address, value)
 
 
-def export_wav(path, channels=2, sample_width=2, sample_rate=48000, fmt=0x0001):
-	if True:
-		wav = wave.open(path, 'wb')
-		wav.setnchannels(channels)
-		wav.setsampwidth(sample_width)
-		wav.setframerate(sample_rate)
-		return wav
-	else:
-		#FIXME: make this code work so we can also export Xbox ADPCM
-		# See https://github.com/Sergeanur/XboxADPCM/blob/master/XboxADPCM/XboxADPCM.cpp
-		f = open(path, 'wb')
-		f.write(b'RIFF')
-		f.write(u32(4+n))
-		f.write(b'WAVE')
-
-		f.write(b'fmt ')
-		f.write(u32(18))
-		f.write(u16(fmt))
-		f.write(u16(channels))
-		f.write(u32(sample_rate))
-		f.write(u32(data_rate)) # nAvgBytesPerSec
-		f.write(u16(0)) # nBlockAlign
-		f.write(u16(sample_width * 8)) # wBitsPerSample
-		f.write(u16(0))
-
-		f.write(b'data')
-		f.write(u32(x)) # FIXME: Must be fixed up
-
-		return f
+def export_wav(path, channels=2, sample_width=2, sample_rate=48000, fmt=better_wave.WAVE_FORMAT_PCM):
+	# Also see https://github.com/Sergeanur/XboxADPCM/blob/master/XboxADPCM/XboxADPCM.cpp for ADPCM
+	wav = better_wave.open(path, 'wb')
+	wav.setformat(fmt)
+	wav.setnchannels(channels)
+	wav.setsampwidth(sample_width)
+	wav.setframerate(sample_rate)
+	return wav
 
 def ac97_status():
 	print("global control=0x" + format(ac97_read_u32(0x12C), '08X'))
