@@ -72,17 +72,22 @@ def dsp_status(dump_buffers = True):
 		NV_PAVS_VOICE_CFG_FMT_LINKED_VOICE = (22,22)
 		NV_PAVS_VOICE_CFG_FMT_PERSIST = (23,23)
 		NV_PAVS_VOICE_CFG_FMT_DATA_TYPE = (24,24)
-		print("Data type: " + ("stream" if mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_DATA_TYPE) else "buffer"))
+		print("Data type: " + ("stream" if mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_DATA_TYPE) > 0 else "buffer"))
+
 		NV_PAVS_VOICE_CFG_FMT_LOOP = (25, 25)
 		print("Loop: " + str(mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_LOOP)))
-		# ???
+
+		# (26,26) ???
+
 		NV_PAVS_VOICE_CFG_FMT_STEREO = (27,27)
 		is_stereo = mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_STEREO) > 0
 		print("Stereo: " + str(is_stereo))
+
 		NV_PAVS_VOICE_CFG_FMT_SAMPLE_SIZE = (29,28)
 		NV_PAVS_VOICE_CFG_FMT_SAMPLE_SIZE_values = [ 'U8', 'S16', 'S24', 'S32' ]
 		sample_size = mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_SAMPLE_SIZE)
 		print("Sample size: " + NV_PAVS_VOICE_CFG_FMT_SAMPLE_SIZE_values[sample_size])
+
 		NV_PAVS_VOICE_CFG_FMT_CONTAINER_SIZE = (31,30)
 		NV_PAVS_VOICE_CFG_FMT_CONTAINER_SIZE_values = ['B8', 'B16', 'ADPCM', 'B32']
 		container_size_values = [1, 2, 4, 4]
