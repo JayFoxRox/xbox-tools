@@ -12,7 +12,7 @@ def dsp_write_u16(address, value):
 def dsp_write_u32(address, value):
 	write_u32(0xFE800000 + address, value)
 
-def dsp_status():
+def dsp_status(dump_buffers = True):
 	def dump_mem(name, index):
 		desc_addr = dsp_read_u32(0x2040 + index)
 		print(name + " addr: 0x" + format(desc_addr, '08X')) # only the upper bits are used [aligned by 0x4000 bytes?!]
@@ -155,30 +155,30 @@ def dsp_status():
 		psl_start_ba_page = psl_start_ba >> 12
 		psl_start_ba_offset = psl_start_ba & 0xFFF
 
-		if True: #FIXME: Should only be done while the CPU is paused / no hw is accessing said buffer
+		if dump_buffers: #FIXME: Should only be done while the CPU is paused / no hw is accessing said buffer
 			channels = 2 if is_stereo else 1
 			in_sample_size = container_size_values[container_size]
 			fmt = 0x0069 if container_size == 2 else 0x0001
 			wav = export_wav("buf" + format(psl_start_ba, '08X') + ".wav", channels, in_sample_size, freq, fmt)
-			samples = ebo
+			samples = ebo + 1
 			while samples > 0:
 				page_base = vp_sge(psl_start_ba_page)
 				paged = page_base + psl_start_ba_offset
 				in_page = 0x1000 - (psl_start_ba_offset & 0xFFF)
 
-				print("Dumping page " + format(paged, '08X'))
+				block_size = in_sample_size * channels
+
+				print("Dumping page " + format(paged, '08X') + " (" + str(samples) + " samples left)")
+				paged |= 0x80000000
 				mapped = map_page(paged, True)	
-				data = read(paged, in_page)
+				data = read(paged, min(in_page, samples * block_size))
 				map_page(paged, mapped)
 
-				samples -= len(data) // (in_sample_size * channels)
+				samples -= len(data) // block_size
 				wav.writeframes(data)
-				if True:
-					psl_start_ba_offset += in_page
-				else:
-					#FIXME: Weird.. why isn't this correct?!
-					psl_start_ba_offset = 0
-					psl_start_ba_page += 1
+
+				psl_start_ba_offset = 0
+				psl_start_ba_page += 1
 			wav.close()
 
 		#Hack to test advancing in buffer:
