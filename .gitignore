@@ -11,3 +11,5 @@ include/
 lib/
 build/
 Build/
+__pycache__/
+*.pyc
