@@ -156,12 +156,10 @@ def dsp_status():
 		psl_start_ba_offset = psl_start_ba & 0xFFF
 
 		if True: #FIXME: Should only be done while the CPU is paused / no hw is accessing said buffer
-			wav = export_wav("buf" + format(psl_start_ba, '08X') + ".wav")
 			channels = 2 if is_stereo else 1
-			wav.setnchannels(channels)
 			in_sample_size = container_size_values[container_size]
-			wav.setsampwidth(in_sample_size)
-			wav.setframerate(freq)
+			fmt = 0x0069 if container_size == 2 else 0x0001
+			wav = export_wav("buf" + format(psl_start_ba, '08X') + ".wav", channels, in_sample_size, freq, fmt)
 			samples = ebo
 			while samples > 0:
 				page_base = vp_sge(psl_start_ba_page)
