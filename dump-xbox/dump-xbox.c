@@ -1,4 +1,4 @@
-#include <openxdk/openxdk.h>
+//#include <openxdk/openxdk.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -10,8 +10,19 @@
 #include <hal/io.h>
 #include <hal/fileio.h>
 
+#include <pbkit/pbkit.h>
+#include <pbkit/outer.h>
+
+#include <xboxkrnl/xboxkrnl.h>
+#include <xboxrt/debug.h>
+#include <xboxrt/string.h>
+
 #include "common/x86.h"
 #include "common/pe.h"
+
+#define printf debugPrint
+#define fflush(x)
+#define fclose(x)
 
 
 void resetFlash(volatile uint8_t* flashRom) {
@@ -62,6 +73,7 @@ void setFlashCache(bool enable) {
 }
 
 bool dumpFile(const uint8_t* data, size_t size, const char* filename) {
+#if 0
   FILE* f = fopen(filename,"w");
   if (f == NULL) {
     return false;
@@ -75,10 +87,11 @@ bool dumpFile(const uint8_t* data, size_t size, const char* filename) {
     offset += written;
   }
   fclose(f);  
+#endif
   return true;
 }
 
-void dumpIoFile(volatile uint8_t* io, off_t offset, size_t size, const char* filename) {
+void dumpIoFile(volatile uint8_t* io, unsigned int offset, size_t size, const char* filename) {
   uint8_t* buffer = malloc(size+1);
   disableInterrupts();
   setFlashCache(false);
@@ -93,14 +106,22 @@ void dumpIoFile(volatile uint8_t* io, off_t offset, size_t size, const char* fil
   return;
 }
 
-void XBoxStartup(void) {
+int main() {
+
+
+	pb_init();
+	pb_show_debug_screen();
+
+  debugPrint("Hello!");
 
   // Open a log file
+#if 0
   const char* log = "log.txt";
   FILE* f = fopen(log,"w");
   fprintf(f,"Failed to log!\n"); fflush(stdout);
   fclose(f);
   freopen(log, "w", stdout);
+#endif
   
   // Workaround missing OpenXDK function
   void(*MmUnmapIoSpaceFix)(PVOID,SIZE_T) = (void*)&MmUnmapIoSpace;

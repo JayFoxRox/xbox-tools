@@ -1,5 +1,6 @@
 # Put the IP address of your FTP enabled xbox here
-XBOX=192.168.177.80
+#XBOX=192.168.177.80
+XBOX=192.168.178.63
 XBOX_PATH=/E/Games/xqemu-tools-dump-xbox
 
 #OpenXDK path
@@ -62,7 +63,7 @@ default.exe: dump-xbox.o
 	$(CC) -o $@ $< $(LD_LIBS) $(LD_FLAGS)
 
 default.xbe: default.exe
-	$(CXBE) -MODE:DEBUG -TITLE:"XQEMU-Tools: dump-xbox" -DUMPINFO:"cxbe.txt" -OUT:"$@" $< > /dev/null
+	$(CXBE) -MODE:RETAIL -TITLE:"XQEMU-Tools: dump-xbox" -DUMPINFO:"cxbe.txt" -OUT:"$@" $< > /dev/null
 
 clean: 
 	rm -f *.o *.exe *.dll *.xbe *.cxbe cxbe.txt
