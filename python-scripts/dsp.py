@@ -160,21 +160,29 @@ def dsp_status(dump_buffers = True):
 			in_sample_size = container_size_values[container_size]
 			fmt = 0x0069 if container_size == 2 else 0x0001
 			wav = export_wav("buf" + format(psl_start_ba, '08X') + ".wav", channels, in_sample_size, freq, fmt)
+
 			samples = ebo + 1
-			while samples > 0:
+			if fmt == 0x0069: # Check for ADPCM
+				#FIXME: Is this correct?
+				#FIXME: Rounding issues?
+				block_size =  0x24 * channels
+				bytes = samples // 64 * block_size
+			else:
+				block_size = in_sample_size * channels
+				bytes = samples * block_size
+
+			while bytes > 0:
 				page_base = vp_sge(psl_start_ba_page)
 				paged = page_base + psl_start_ba_offset
 				in_page = 0x1000 - (psl_start_ba_offset & 0xFFF)
 
-				block_size = in_sample_size * channels
-
-				print("Dumping page " + format(paged, '08X') + " (" + str(samples) + " samples left)")
+				print("Dumping page " + format(paged, '08X') + " (" + str(bytes) + " bytes left)")
 				paged |= 0x80000000
 				mapped = map_page(paged, True)	
-				data = read(paged, min(in_page, samples * block_size))
+				data = read(paged, min(in_page, bytes))
 				map_page(paged, mapped)
 
-				samples -= len(data) // block_size
+				bytes -= len(data)
 				wav.writeframes(data)
 
 				psl_start_ba_offset = 0
