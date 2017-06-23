@@ -4,7 +4,10 @@
 *.exe
 *.xbe
 *.txt
+*.wav
 bin/
 i386-pc-xbox/
 include/
 lib/
+build/
+Build/
