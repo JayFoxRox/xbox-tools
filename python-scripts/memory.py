@@ -1,14 +1,3 @@
-import gdb
-
-inf = gdb.selected_inferior()
-
-def read(address, size):
-	return bytes(inf.read_memory(address, size))
-
-def write(address, data):
-	value = bytes(data)
-	inf.write_memory (address, value)
-
 def read_u8(address):
 	data = read(address, 1)
 	return int.from_bytes(data, byteorder='little', signed=False)

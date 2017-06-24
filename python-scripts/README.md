@@ -2,7 +2,9 @@
 
 This is a collection of scripts to access various Xbox hardware.
 
-## Usage:
+## Usage
+
+### GDB Interface
 
 Connect GDB to target. For example:
 
@@ -18,6 +20,8 @@ Now source the python scripts you intend to use (memory.py should always be load
 
 ```
 (gdb) source memory.py
+(gdb) source memory_gdb.py
+(gdb) source audio.py
 (gdb) source dsp.py
 ```
 
@@ -34,3 +38,10 @@ Top voice: 0x0048
 ...
 ```
 
+### XBDM Interface
+
+This interface depends on hooking the XBDM `resume` function.
+
+```
+gdb -ex "source memory.py" -ex "source pe.py" -ex 'source memory_xbdm.py' -ex "source audio.py" -ex "source dsp.py" -ex "py dsp_status()"
+```
