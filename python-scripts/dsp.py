@@ -72,7 +72,8 @@ def dsp_status(dump_buffers = True):
 		NV_PAVS_VOICE_CFG_FMT_LINKED_VOICE = (22,22)
 		NV_PAVS_VOICE_CFG_FMT_PERSIST = (23,23)
 		NV_PAVS_VOICE_CFG_FMT_DATA_TYPE = (24,24)
-		print("Data type: " + ("stream" if mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_DATA_TYPE) > 0 else "buffer"))
+		is_stream = (mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_DATA_TYPE) > 0)
+		print("Data type: " + ("stream" if is_stream else "buffer"))
 
 		NV_PAVS_VOICE_CFG_FMT_LOOP = (25, 25)
 		print("Loop: " + str(mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_LOOP)))
@@ -160,7 +161,7 @@ def dsp_status(dump_buffers = True):
 		psl_start_ba_page = psl_start_ba >> 12
 		psl_start_ba_offset = psl_start_ba & 0xFFF
 
-		if dump_buffers: #FIXME: Should only be done while the CPU is paused / no hw is accessing said buffer
+		if dump_buffers and not is_stream: #FIXME: Should only be done while the CPU is paused / no hw is accessing said buffer
 			channels = 2 if is_stereo else 1
 			in_sample_size = container_size_values[container_size]
 			fmt = 0x0011 if container_size == 2 else 0x0001
