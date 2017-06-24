@@ -3,6 +3,7 @@ if not "" in sys.path:
 	sys.path += [""]
 import better_wave
 import time
+import pyaudio
 
 def ac97_read_u8(address):
 	return read_u8(0xFEC00000 + address)
@@ -68,27 +69,42 @@ def ac97_trace():
 		if (addr != 0) or (length != 0) or (control != 0):
 			print(str(i) + ": 0x" + format(addr, '08X') + " (" + str(length) + " samples); control: 0x" + format(control, '04X'))
 			addr |= 0x80000000
-			current_milli_time = lambda: round(time.time() * 1000)
-			chunks = 2
-			chunk_size = length * 2 // chunks
+			current_milli_time = lambda: time.time() * 1000.0
+			chunks = 16
+			buffer_size = length * 2
+			chunk_size = buffer_size // chunks
 			catchup = 0
 
 			# Wait for start of playback
 			
-			time_for_buffer = (length / 2) / 48000.0 * 1000.0
+			sample_rate = 48000.0
+			time_for_buffer = (length / 2) / sample_rate * 1000.0
 			time_per_chunk = time_for_buffer / chunks
 
+			pya = pyaudio.PyAudio()
+			stream = pya.open(format=pya.get_format_from_width(width=2), channels=2, rate=int(sample_rate), output=True)
+
+			#FIXME: This was an experiment on how long it would take to dump the entire buffer
+			#				We can probably dump the entire buffer and then just grab the data we need
+			#				[as we can follow the write cursor by diff'ing the buffers]
+			if False:
+				start = current_milli_time()
+				data = read(addr, buffer_size)
+				took = current_milli_time() - start
+				print("Took " + str(took) + " / " + str(time_for_buffer) + " ms")
+
+			# This is a poc where I try to find out when buffers are written
 			print("Waiting for playback")
 			last = None
 			while True:
-				new = read_u32(addr)
+				new = read_u32(addr + chunk_size - 4)
 				if last != None and last != new:
 					print("Playback started!")
+					time.sleep(time_for_buffer * 0.5 / 1000.0) # Give it another half buffer headstart
 					# Playback reached us! Wait until the write cursor reaches the other half of the buffer
-					time.sleep(time_for_buffer / 2.0 / 1000.0)
 					break
 				last = new
-
+			
 			underruns = 0
 			for i in range(0, 500):
 				offset = 0
@@ -98,16 +114,22 @@ def ac97_trace():
 					data = read(addr + offset, chunk_size)
 					offset += chunk_size
 					streamed_data += data
+					stream.write(bytes(data))
 					took = current_milli_time() - start
 					remain = time_per_chunk - took
 					remain -= catchup
 					if remain > 0:
 						time.sleep(remain / 1000.0)
+						took = current_milli_time() - start
+						remain = time_per_chunk - took
 					else:
-						catchup += remain
 						underruns += 1
+					catchup -= remain
 						#print("too slow!")
 				wav.writeframes(streamed_data)
 			print("Had " + str(underruns) + " underruns")
-		
+
+			stream.stop_stream()
+			stream.close()
+
 
