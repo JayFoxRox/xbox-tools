@@ -1,8 +1,10 @@
 import socket
 import struct
 
-HOST = "127.0.0.1"
-PORT = 8731 # FIXME: Actually 731, but linux doesn't like that [needs more permissions]
+#HOST = "127.0.0.1"
+#PORT = 8731 # FIXME: Actually 731, but linux doesn't like that [needs more permissions]
+HOST = "192.168.177.2"
+PORT = 731
 
 xbdm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 xbdm.connect((HOST, PORT))
@@ -115,10 +117,11 @@ if True:
 	xbdm_command("setmem addr=0x" + format(DmResumeThread_addr, 'X') + " data=" + hack)
 	
 	#hack_bank = DmResumeThread_addr + (len(hack) // 2) # Put communication base behind the hack code [pretty shitty..]
-	hack_bank = 0xD004E000 - 12 # Top of stack
+	hack_bank = 0xd0032FC0#  0xD004E000 - 12 # Top of stack
 
 	hacked = True
 	print("Hack installed, bank at 0x" + format(hack_bank, '08X'))
+	#base=0xb0011000
 
 def xbdm_hack(address, operation, data=0):
 	SetMem(hack_bank, struct.pack("<III", address, operation, data))
@@ -159,3 +162,4 @@ def write(address, data):
 			return xbdm_write_32(address, data)
 	return SetMem(address, size)
 
+print(read_u32(0x80010000))
