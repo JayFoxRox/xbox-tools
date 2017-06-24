@@ -22,7 +22,7 @@ def xbdm_read_line():
 		data += byte
 	return data
 
-def xbdm_parse_response():
+def xbdm_parse_response(length=None):
 	res = xbdm_read_line()
 	status = res[0:4]
 	if status == b'200-':
@@ -30,6 +30,16 @@ def xbdm_parse_response():
 	if status == b'201-':
 		print(status)
 		return
+	if status == b'203-':
+		res = bytearray()
+		assert(length != None)
+		while True:
+			remaining = length - len(res)
+			if remaining == 0:
+				break
+			assert(remaining > 0)
+			res += xbdm.recv(remaining)
+		return bytes(res)
 	if status == b'202-':
 		lines = []
 		while True:
@@ -42,12 +52,12 @@ def xbdm_parse_response():
 	assert(False)
 
 
-def xbdm_command(cmd):
+def xbdm_command(cmd, length=None):
 	#FIXME: If type is already in bytes we just send it binary!
 	#print("Running '" + cmd + "'")
 	xbdm.send(bytes(cmd + "\r\n", encoding='ascii'))
 	#print("Sent")
-	lines = xbdm_parse_response()
+	lines = xbdm_parse_response(length)
 	#print("Done")
 	return lines
 
@@ -75,25 +85,30 @@ def GetModules():
 
 
 def GetMem(addr, length):
-	cmd = "getmem addr=0x" + format(addr, 'X') + " length=0x" + format(length, 'X')
-	lines = xbdm_command(cmd)
-	data = bytearray()
-	for line in lines:
-		line = str(line, encoding='ascii').strip()
-		for i in range(0, len(line) // 2):
-			byte = line[i*2+0:i*2+2]
-			if '?' in byte:
-				print("Oops?!")
-				byte = '00'
-			data.append(int(byte,16))
-	assert(len(data) == length)
+	if False:
+		cmd = "getmem addr=0x" + format(addr, 'X') + " length=0x" + format(length, 'X')
+		lines = xbdm_command(cmd)
+		data = bytearray()
+		for line in lines:
+			line = str(line, encoding='ascii').strip()
+			for i in range(0, len(line) // 2):
+				byte = line[i*2+0:i*2+2]
+				if '?' in byte:
+					print("Oops?!")
+					byte = '00'
+				data.append(int(byte,16))
+		assert(len(data) == length)
+	else:
+		cmd = "getmem2 addr=0x" + format(addr, 'X') + " length=0x" + format(length, 'X')
+		data = xbdm_command(cmd, length)
 	return bytes(data)
 
 def SetMem(addr, data):
 	value = bytes(data)
-	cmd="setmem addr=0x" + format(addr, 'X') + " data="
-	for i in range(0, len(data)):
-		cmd += format(value[i], '02X')
+	if True:
+		cmd="setmem addr=0x" + format(addr, 'X') + " data="
+		for i in range(0, len(data)):
+			cmd += format(value[i], '02X')
 	xbdm_command(cmd)
 
 def read(address, size):
