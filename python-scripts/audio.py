@@ -70,34 +70,77 @@ def ac97_trace():
 			print(str(i) + ": 0x" + format(addr, '08X') + " (" + str(length) + " samples); control: 0x" + format(control, '04X'))
 			addr |= 0x80000000
 			current_milli_time = lambda: time.time() * 1000.0
-			chunks = 16
 			buffer_size = length * 2
-			chunk_size = buffer_size // chunks
+			chunk_size = 1024 # Hardare runs at this chunk size
 			catchup = 0
 
 			# Wait for start of playback
-			
 			sample_rate = 48000.0
 			time_for_buffer = (length / 2) / sample_rate * 1000.0
-			time_per_chunk = time_for_buffer / chunks
-
-			pya = pyaudio.PyAudio()
-			stream = pya.open(format=pya.get_format_from_width(width=2), channels=2, rate=int(sample_rate), output=True)
+			time_per_chunk = time_for_buffer / (buffer_size / chunk_size)
 
 			#FIXME: This was an experiment on how long it would take to dump the entire buffer
 			#				We can probably dump the entire buffer and then just grab the data we need
 			#				[as we can follow the write cursor by diff'ing the buffers]
 			if False:
+				prev_data = None
 				start = current_milli_time()
-				data = read(addr, buffer_size)
-				took = current_milli_time() - start
-				print("Took " + str(took) + " / " + str(time_for_buffer) + " ms")
+				bt = 0
+				min_delta = 999999999
+				min_non_delta = 0
+				t_last = None
+				while(True):
+					data = read(addr, buffer_size)
+					diff = ""
+					blocks = 165
+					block_size = buffer_size / blocks
+					if prev_data != None:
+
+						if True:
+							first = buffer_size - 1
+							last = 0
+							for i in range(0, buffer_size):
+								if data[i] != prev_data[i]:
+									first = min(i, first)
+									last = max(i, last)
+							t = (current_milli_time() - start) * 1000
+							if t_last:
+								delta = t - t_last
+								ts = str(int(t)).rjust(7)
+								size = max(last - first + 1, 0)
+								if size >= 8000:
+									bt = t
+								if (size == 0):
+									min_non_delta = max(delta, min_non_delta)
+									msg = ts + ": No changes"
+								else:
+									# Find the shortest delta
+									min_delta = min(delta, min_delta)
+									msg = ts + ": From " + str(first) + " to " + str(last) + " (" + str(size) + " bytes)"
+								of = t - bt # Offset in frame
+								print(msg.ljust(50) + "+" + str(int(of)).ljust(5) + " (dt: " + str(int(delta)).ljust(5) + " min-dt: " + str(int(min_delta)) + " / non-dt: " + str(int(min_non_delta)) + ")")
+							t_last = t
+						else:
+							for i in range(0, blocks):
+								idx = int(block_size*i)
+								if data[idx:int(idx+block_size)] == prev_data[idx:int(idx+block_size)]:
+									diff += ' ' 
+								else:
+									diff += '#' 
+							print("[" + diff + "]")
+					prev_data = data
+					took = current_milli_time() - start
+					#print("Took " + str(took) + " / " + str(time_for_buffer) + " ms")
+
+			pya = pyaudio.PyAudio()
+			stream = pya.open(format=pya.get_format_from_width(width=2), channels=2, rate=int(sample_rate), output=True)
 
 			# This is a poc where I try to find out when buffers are written
+			#FIXME: This should sit somewhere in the streaming loop so we can resync
 			print("Waiting for playback")
 			last = None
 			while True:
-				new = read_u32(addr + chunk_size - 4)
+				new = read_u32(addr)
 				if last != None and last != new:
 					print("Playback started!")
 					time.sleep(time_for_buffer * 0.5 / 1000.0) # Give it another half buffer headstart
@@ -106,27 +149,37 @@ def ac97_trace():
 				last = new
 			
 			underruns = 0
-			for i in range(0, 500):
-				offset = 0
+			offset = 512 # Hardware buffer starts at 512 byte offset
+			for i in range(0, 5000):
+				offset %= buffer_size
+				start = current_milli_time()
+
 				streamed_data = bytearray()
-				for j in range(0, chunks):
-					start = current_milli_time()
-					data = read(addr + offset, chunk_size)
-					offset += chunk_size
-					streamed_data += data
-					stream.write(bytes(data))
+
+				to_end = buffer_size - offset
+				data = read(addr + offset, min(chunk_size, to_end))
+				remaining = chunk_size - len(data)
+				if remaining > 0:
+					data += read(addr, remaining)
+
+				offset += chunk_size
+
+				# Write output
+				stream.write(bytes(data))
+				wav.writeframes(data)
+
+				took = current_milli_time() - start
+				remain = time_per_chunk - took
+				remain -= catchup
+				if remain > 0:
+					time.sleep(remain / 1000.0)
 					took = current_milli_time() - start
 					remain = time_per_chunk - took
-					remain -= catchup
-					if remain > 0:
-						time.sleep(remain / 1000.0)
-						took = current_milli_time() - start
-						remain = time_per_chunk - took
-					else:
-						underruns += 1
-					catchup -= remain
-						#print("too slow!")
-				wav.writeframes(streamed_data)
+				else:
+					underruns += 1
+				catchup -= remain
+					#print("too slow!")
+
 			print("Had " + str(underruns) + " underruns")
 
 			stream.stop_stream()
