@@ -12,7 +12,7 @@ def dsp_write_u16(address, value):
 def dsp_write_u32(address, value):
   write_u32(0xFE800000 + address, value)
 
-def dsp_status(dump_buffers = True):
+def dsp_status(dump_buffers = False):
   def dump_mem(name, index):
     desc_addr = dsp_read_u32(0x2040 + index)
     print(name + " addr: 0x" + format(desc_addr, '08X')) # only the upper bits are used [aligned by 0x4000 bytes?!]
@@ -111,6 +111,36 @@ def dsp_status(dump_buffers = True):
   vpsgeaddr |= 0x80000000
   def vp_sge(sge_handle):
     return read_u32(vpsgeaddr + sge_handle * 8)
+
+  # Check out FIFOs
+
+  NV_PAPU_GPOF0 = 0x3024 # 4 x 0x10 pitch
+  NV_PAPU_GPIF0 = 0x3064 # 2 x 0x10 pitch
+
+  NV_PAPU_EPOF0 = 0x4024 # 4 x 0x10 pitch
+  NV_PAPU_EPIF0 = 0x4064 # 2 x 0x10 pitch
+
+  def dump_fifo(name, addr):
+    base = dsp_read_u32(addr + 0) & 0x00FFFF00
+    end = dsp_read_u32(addr + 4) & 0x00FFFF00
+    cur = dsp_read_u32(addr + 8) & 0x00FFFFFC
+    print(name + " BASE=0x" + format(base, '08X') + " END=0x" + format(end, '08X') + " CUR=0x" + format(cur, '08X'))
+
+
+  for i in range(0,4):
+    dump_fifo("GPOF" + str(i), NV_PAPU_GPOF0 + i * 0x10)
+  print("")
+  for i in range(0,2):
+    dump_fifo("GPIF" + str(i), NV_PAPU_GPIF0 + i * 0x10)
+  print("")
+  print("")
+  for i in range(0,4):
+    dump_fifo("EPOF" + str(i), NV_PAPU_EPOF0 + i * 0x10)
+  print("")
+  for i in range(0,2):
+    dump_fifo("EPIF" + str(i), NV_PAPU_EPIF0 + i * 0x10)
+  print("")
+
 
   # Dump voices
   NV_PAVS_SIZE = 0x80
