@@ -37,19 +37,84 @@ def dsp_status(dump_buffers = True):
 		dump_mem("GPF", 4)
 		dump_mem("GPS", 0)
 
+
+	NV_PAPU_VPVADDR   = 0x202C
+	vpvaddr = dsp_read_u32(NV_PAPU_VPVADDR)
 	NV_PAPU_VPSGEADDR = 0x2030
 	vpsgeaddr = dsp_read_u32(NV_PAPU_VPSGEADDR)
-	print("Voices SGE stored at 0x" + format(vpsgeaddr, '08X'))
+	NV_PAPU_VPSSLADDR = 0x2034
+	vpssladdr = dsp_read_u32(NV_PAPU_VPSSLADDR)
+	NV_PAPU_VPHTADDR  = 0x2038
+	vphtaddr = dsp_read_u32(NV_PAPU_VPHTADDR)
+	NV_PAPU_VPHCADDR  = 0x203C
+	vphcaddr = dsp_read_u32(NV_PAPU_VPHCADDR)
+	NV_PAPU_GPSADDR   = 0x2040
+	gpsaddr = dsp_read_u32(NV_PAPU_GPSADDR)
+	NV_PAPU_GPFADDR   = 0x2044
+	gpfaddr = dsp_read_u32(NV_PAPU_GPFADDR)
+	NV_PAPU_EPSADDR   = 0x2048
+	epsaddr = dsp_read_u32(NV_PAPU_EPSADDR)
+	NV_PAPU_EPFADDR   = 0x204C
+	epfaddr = dsp_read_u32(NV_PAPU_EPFADDR)
+
+	print("NV_PAPU_VPVADDR: 0x" + format(vpvaddr, '08X'))
+	print("NV_PAPU_VPSGEADDR: 0x" + format(vpsgeaddr, '08X'))
+	print("NV_PAPU_VPSSLADDR: 0x" + format(vpssladdr, '08X'))
+	print("NV_PAPU_VPHTADDR: 0x" + format(vphtaddr, '08X'))
+	print("NV_PAPU_VPHCADDR: 0x" + format(vphcaddr, '08X'))
+	print("NV_PAPU_GPSADDR: 0x" + format(gpsaddr, '08X'))
+	print("NV_PAPU_GPFADDR: 0x" + format(gpfaddr, '08X'))
+	print("NV_PAPU_EPSADDR: 0x" + format(epsaddr, '08X'))
+	print("NV_PAPU_EPFADDR: 0x" + format(epfaddr, '08X'))
+	print("")
+
+	for i in range(0, 10):
+		print("*NV_PAPU_VPVADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | vpvaddr+i*4), '08X'))
+	print("")
+
+	for i in range(0, 10):
+		print("*NV_PAPU_VPSGEADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | vpsgeaddr+i*4), '08X'))
+	print("")
+
+	for i in range(0, 10):
+		print("*NV_PAPU_VPSSLADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | vpssladdr+i*4), '08X'))
+	print("")
+
+	for i in range(0, 10):
+		print("*NV_PAPU_VPHTADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | vphtaddr+i*4), '08X'))
+	print("")
+
+	for i in range(0, 10):
+		print("*NV_PAPU_VPHCADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | vphcaddr+i*4), '08X'))
+	print("")
+
+	for i in range(0, 10):
+		print("*NV_PAPU_GPSADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | gpsaddr+i*4), '08X'))
+	print("")
+
+	for i in range(0, 10):
+		print("*NV_PAPU_GPFADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | gpfaddr+i*4), '08X'))
+	print("")
+
+	for i in range(0, 10):
+		print("*NV_PAPU_EPSADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | epsaddr+i*4), '08X'))
+	print("")
+
+	for i in range(0, 10):
+		print("*NV_PAPU_EPFADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | epfaddr+i*4), '08X'))
+	print("")
+
+	# Looks like EPF points to the AC97 buffer!
+	epfaddr |= 0x80000000
+	print("EP F..? address points to an entry which points to 0x" + format(read_u32(epfaddr), '08X'))
+
 	vpsgeaddr |= 0x80000000
 	def vp_sge(sge_handle):
 		return read_u32(vpsgeaddr + sge_handle * 8)
 
 	# Dump voices
-	NV_PAPU_VPVADDR = 0x202C
 	NV_PAVS_SIZE = 0x80
 
-	vpvaddr = dsp_read_u32(NV_PAPU_VPVADDR)
-	print("Voices stored at 0x" + format(vpvaddr, '08X'))
 	vpvaddr |= 0x80000000
 	def dump_voice(voice_handle):
 		def mask(value, field):
@@ -106,7 +171,8 @@ def dsp_status(dump_buffers = True):
 		psl_start_ba = read_u32(voice_addr + NV_PAVS_VOICE_CUR_PSL_START) & 0xFFFFFF
 		print("buffer start: 0x" + format(psl_start_ba, '08X'))
 		NV_PAVS_VOICE_CUR_PSH_SAMPLE = 0x24 # loop start?
-		print("loop start (samples?): " + format(read_u32(voice_addr + NV_PAVS_VOICE_CUR_PSH_SAMPLE), '08X'))
+		cur_psh_sample = read_u32(voice_addr + NV_PAVS_VOICE_CUR_PSH_SAMPLE)
+		print("loop start (samples?): " + format(cur_psh_sample & 0xFFFFFF, '08X'))
 		NV_PAVS_VOICE_CUR_VOLA = 0x28
 		NV_PAVS_VOICE_CUR_VOLB = 0x2C
 		NV_PAVS_VOICE_CUR_VOLC = 0x30
@@ -126,7 +192,8 @@ def dsp_status(dump_buffers = True):
 		print("State[Active]: " + str(par_state & NV_PAVS_VOICE_PAR_STATE_ACTIVE_VOICE > 0))
 
 		NV_PAVS_VOICE_PAR_OFFSET = 0x58 # current playback offset
-		print("current offset (samples?): 0x" + format(read_u32(voice_addr + NV_PAVS_VOICE_PAR_OFFSET), '08X'))
+		par_offset = read_u32(voice_addr + NV_PAVS_VOICE_PAR_OFFSET) # Warning: Upper 8 bits will be 0xFF (?) on hw!
+		print("current offset (samples?): 0x" + format(par_offset & 0xFFFFFF, '08X'))
 		NV_PAVS_VOICE_PAR_NEXT = 0x5C # end of buffer?
 		ebo = read_u32(voice_addr + NV_PAVS_VOICE_PAR_NEXT) & 0xFFFFFF
 		print("end of buffer (samples): 0x" + format(ebo, '08X'))
