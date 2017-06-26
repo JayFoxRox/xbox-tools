@@ -124,7 +124,7 @@ def SetMem(addr, data):
 def read(address, size):
 	return GetMem(address, size)
 def write(address, data):
-	return SetMem(address, size)
+	return SetMem(address, data)
 
 # Get login message
 xbdm_parse_response()
@@ -185,4 +185,4 @@ def write(address, data):
 			return xbdm_write_16(address, data)
 		if size == 4:
 			return xbdm_write_32(address, data)
-	return SetMem(address, size)
+	return SetMem(address, data)
