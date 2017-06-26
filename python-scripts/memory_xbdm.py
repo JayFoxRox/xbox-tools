@@ -1,6 +1,7 @@
 import socket
 import struct
 import os
+import sys
 
 XBOX = os.environ['XBOX']
 
@@ -12,9 +13,11 @@ else:
   HOST = pt[0]
   PORT = int(pt[2])
 
-xbdm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 print("Connecting to '" + HOST + "' (Port " + str(PORT) + ")")
-xbdm.connect((HOST, PORT))
+try:
+  xbdm = socket.create_connection((HOST, PORT), timeout=0.5)
+except:
+  sys.exit("Connection error")
 
 def xbdm_read_line():
 	data = b''
