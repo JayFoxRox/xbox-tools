@@ -1,12 +1,19 @@
 import socket
 import struct
+import os
 
-#HOST = "127.0.0.1"
-#PORT = 8731 # FIXME: Actually 731, but linux doesn't like that [needs more permissions]
-HOST = "192.168.177.2"
-PORT = 731
+XBOX = os.environ['XBOX']
+
+if XBOX is None:
+  HOST = "127.0.0.1"
+  PORT = 731
+else:
+  pt = XBOX.partition(":")
+  HOST = pt[0]
+  PORT = int(pt[2])
 
 xbdm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+print("Connecting to '" + HOST + "' (Port " + str(PORT) + ")")
 xbdm.connect((HOST, PORT))
 
 def xbdm_read_line():
@@ -176,5 +183,3 @@ def write(address, data):
 		if size == 4:
 			return xbdm_write_32(address, data)
 	return SetMem(address, size)
-
-print(read_u32(0x80010000))
