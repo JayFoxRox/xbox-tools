@@ -1,3 +1,5 @@
+import math
+
 def apu_read_u8(address):
   return read_u8(0xFE800000 + address)
 def apu_read_u16(address):
@@ -22,6 +24,11 @@ NV_PAPU_GPFADDR   = 0x2044
 NV_PAPU_EPSADDR   = 0x2048
 NV_PAPU_EPFADDR   = 0x204C
 
+NV_PAPU_GPSMAXSGE = 0x20D4
+NV_PAPU_GPFMAXSGE = 0x20D8
+NV_PAPU_EPSMAXSGE = 0x20DC
+NV_PAPU_EPFMAXSGE = 0x20E0
+
 def apu_mem():
   def dump_mem(name, index):
     desc_addr = apu_read_u32(0x2040 + index)
@@ -32,10 +39,9 @@ def apu_mem():
     desc_addr |= 0x80000000
     for i in range(0, desc_length):
       addr = read_u32(desc_addr + i * 8 + 0)
-      flags = read_u16(desc_addr + i * 8 + 4)
-      length = read_u16(desc_addr + i * 8 + 6)
+
       print(" Address: 0x" + format(addr, '08X') + "; Flags: 0x" + format(flags, '04X') + "; Length: " + str(length))
-      assert(length == 0) # Shocker if this works!
+
       addr |= 0x80000000
       data = read(addr, length)
       wav.writeframes(data)
@@ -57,70 +63,58 @@ def apu_mem():
   epsaddr = apu_read_u32(NV_PAPU_EPSADDR)
   epfaddr = apu_read_u32(NV_PAPU_EPFADDR)
 
-  print("NV_PAPU_VPVADDR: 0x" + format(vpvaddr, '08X'))
-  print("NV_PAPU_VPSGEADDR: 0x" + format(vpsgeaddr, '08X'))
-  print("NV_PAPU_VPSSLADDR: 0x" + format(vpssladdr, '08X'))
-  print("NV_PAPU_VPHTADDR: 0x" + format(vphtaddr, '08X'))
-  print("NV_PAPU_VPHCADDR: 0x" + format(vphcaddr, '08X'))
-  print("NV_PAPU_GPSADDR: 0x" + format(gpsaddr, '08X'))
-  print("NV_PAPU_GPFADDR: 0x" + format(gpfaddr, '08X'))
-  print("NV_PAPU_EPSADDR: 0x" + format(epsaddr, '08X'))
-  print("NV_PAPU_EPFADDR: 0x" + format(epfaddr, '08X'))
-  print("")
+  def dump_mem_map(name, addr, sge_count = 0):
+    print(name + ": 0x" + format(addr, '08X'))
+    if sge_count == 0:
+      return
+    length = 0
+    for i in range(0, sge_count + 1): # Last one is just to dump out data
+      if i < sge_count:
+        data_addr = read_u32(0x80000000 | addr + i * 8 + 0)
+        data_flags = read_u16(0x80000000 | addr + i * 8 + 4)
+        data_length = read_u16(0x80000000 | addr + i * 8 + 6)
+      addr_from = i * 0x1000
+      # Be smart and combine multiple entries into one..
+      if (i > 0 and (data_addr != last_data_addr + 0x1000 or data_flags != last_data_flags)) or i == sge_count:
+        print("  0x" + format(addr_from - length, '06X') + " - 0x" + format(addr_from - 1, '06X') + " maps to RAM 0x" + format(last_data_addr - length, '08X') + " - 0x" + format(last_data_addr + 0xFFF, '08X') + " flags: 0x" + format(last_data_flags, '04X'))
+        length = 0
+      length += 0x1000
+      assert(data_flags == 0)
+      assert(data_length == 0) #FIXME: This should be enabled, but the last entries are sometimes bogus?!
+      last_data_addr = data_addr
+      last_data_flags = data_flags
 
-  #FIXME: Move this into a routine which respects the MAXSGE [much like dump_mem above]
+  gpsmaxsge = apu_read_u32(NV_PAPU_GPSMAXSGE) & 0xFFFF
+  gpfmaxsge = apu_read_u32(NV_PAPU_GPFMAXSGE) & 0xFFFF
+  epsmaxsge = apu_read_u32(NV_PAPU_EPSMAXSGE) & 0xFFFF
+  epfmaxsge = apu_read_u32(NV_PAPU_EPFMAXSGE) & 0xFFFF
 
-  for i in range(0, 10):
-    print("*NV_PAPU_VPVADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | vpvaddr+i*4), '08X'))
-  print("")
+  dump_mem_map("NV_PAPU_VPVADDR", vpvaddr)
+  dump_mem_map("NV_PAPU_VPSGEADDR", vpsgeaddr, 0x1000 // 8)
+  dump_mem_map("NV_PAPU_VPSSLADDR", vpssladdr)
+  dump_mem_map("NV_PAPU_VPHTADDR", vphtaddr)
+  dump_mem_map("NV_PAPU_VPHCADDR", vphcaddr)
+  # This looks like an off-by-one in the MS code?!
+  # (Should be MAXSGE+1 but then we get bogus data)
+  #FIXME: Test on hardware
+  dump_mem_map("NV_PAPU_GPSADDR", gpsaddr, gpsmaxsge)
+  dump_mem_map("NV_PAPU_GPFADDR", gpfaddr, gpfmaxsge)
+  dump_mem_map("NV_PAPU_EPSADDR", epsaddr, epsmaxsge)
+  dump_mem_map("NV_PAPU_EPFADDR", epfaddr, epfmaxsge)
 
-  for i in range(0, 10):
-    print("*NV_PAPU_VPSGEADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | vpsgeaddr+i*4), '08X'))
-  print("")
-
-  for i in range(0, 10):
-    print("*NV_PAPU_VPSSLADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | vpssladdr+i*4), '08X'))
-  print("")
-
-  for i in range(0, 10):
-    print("*NV_PAPU_VPHTADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | vphtaddr+i*4), '08X'))
-  print("")
-
-  for i in range(0, 10):
-    print("*NV_PAPU_VPHCADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | vphcaddr+i*4), '08X'))
-  print("")
-
-  for i in range(0, 10):
-    print("*NV_PAPU_GPSADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | gpsaddr+i*4), '08X'))
-  print("")
-
-  for i in range(0, 10):
-    print("*NV_PAPU_GPFADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | gpfaddr+i*4), '08X'))
-  print("")
-
-  for i in range(0, 10):
-    print("*NV_PAPU_EPSADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | epsaddr+i*4), '08X'))
-  print("")
-
-  for i in range(0, 10):
-    print("*NV_PAPU_EPFADDR[" + str(i) + "]: 0x" + format(read_u32(0x80000000 | epfaddr+i*4), '08X'))
-  print("")
-
-  # Looks like EPF points to the AC97 buffer!
-  epfaddr |= 0x80000000
-  print("EP F..? address points to an entry which points to 0x" + format(read_u32(epfaddr), '08X'))
 
 #FIXME: Take argument for max_sge
-def apu_read_mem(sge_addr, base, end):
-  #FIXME: Also make work with odd data
-  assert(base & 0xFFF == 0)
-  assert(end & 0xFFF == 0)
-  first_sge_idx = base // 0x1000
-  last_sge_idx = end // 0x1000
+def apu_read_mem(sge_addr, base, length):
+  #FIXME: Also make work with odd data  
   data = bytearray()
-  for idx in range(first_sge_idx, last_sge_idx):
-    data_addr = read_u32(0x80000000 | sge_addr + idx * 8 + 0)
-    data += read(0x80000000 | data_addr, 0x1000)
+  address = base
+  remaining = length
+  while remaining > 0:
+    page = address // 0x1000
+    offset = address % 0x1000
+    data_addr = read_u32(0x80000000 | sge_addr + page * 8 + 0)
+    data += read(0x80000000 | data_addr + offset, min(remaining, 0x1000 - offset))
+    remaining = length - len(data)
   return data
 
 def apu_write_mem(sge_addr, base, data):
@@ -138,7 +132,7 @@ def apu_fifos(dump = False):
     cur = apu_read_u32(addr + 8) & 0x00FFFFFC
     print(name + " BASE=0x" + format(base, '08X') + " END=0x" + format(end, '08X') + " CUR=0x" + format(cur, '08X'))
     if dump:
-      data = apu_read_mem(sge_addr, base, end)
+      data = apu_read_mem(sge_addr, base, end - base)
       wav = export_wav(name + ".wav")
       wav.writeframes(data)
       wav.close()
@@ -220,27 +214,50 @@ def load_dsp_code(path):
     data = int(s[2],16)
     assert(addr == curaddr) # Code with gaps not supported
     assert(data >= 0 and data <= 0xFFFFFF)
-    print("Program data [0x" + format(addr, '04X') + "]: 0x" + format(data, '06X'))
+    #print("Program data [0x" + format(addr, '04X') + "]: 0x" + format(data, '06X'))
     code += int.to_bytes(data, length=3, byteorder='little')
     curaddr = addr + 1
   return code
+
+NV_PAPU_GPXMEM = 0x30000 
+NV_PAPU_GPMIXBUF = 0x35000
+NV_PAPU_GPYMEM = 0x36000
+NV_PAPU_GPPMEM = 0x3A000
 
 NV_PAPU_GPRST = 0x3FFFC
 NV_PAPU_GPRST_GPRST = (1 << 0)
 NV_PAPU_GPRST_GPDSPRST = (1 << 1)
 
 def apu_gp():
-  NV_PAPU_GPXMEM = 0x30000 
-  NV_PAPU_GPMIXBUF = 0x35000
-  NV_PAPU_GPYMEM = 0x36000
-  NV_PAPU_GPPMEM = 0x3A000
-
   gpsaddr = apu_read_u32(NV_PAPU_GPSADDR)
+
+  data = bytearray()
+  seconds = 2
+  start = time.time()
+  duration = 0
+
+  #FIXME: Hack for performance
+  addr = 0x9000 # See http://xboxdevwiki.net/APU#Usage_in_DirectSound for the channel order
+  data_addr = read_u32(0x80000000 | gpsaddr + (addr // 0x1000) * 8 + 0)
+  for i in range(0, seconds * 48000 // 0x20):
+    #FIXME: Improve performance of the following:
+    #data += apu_read_mem(gpsaddr, 0x8000, 256)
+
+    data += read(0x80000000 | data_addr + (addr % 0x1000) + (0x20 * 4 * i) % 0x800, 0x20 * 4)
+    while duration < i * 0x20 / 48000:
+      duration = time.time() - start
+  data = to_dsp(data)
+
+  print("Took " + str(duration * 1000.0) + "ms. Expected " + str(seconds * 1000.0) + "ms")
+
+  wav = export_wav("GP-outmaybemaybenot.wav", channels=1, sample_width=3)
+  wav.writeframes(data)
+  wav.close()
 
   # Dump out MIXBUF [should be part of VP functions imo]
   #FIXME: Support dumping multiple bins at once?
   def dump_bin(index, seconds=2):
-    # MIXBUF is 0x400 = 32 bins * 0x20 words which contain 48kHz 24 bit PCM
+    # MIXBUF is 0x400 = 32 bins * 0x20 words which contain 48kHz 24-bit PCM
     data = bytearray()
 
     start = time.time()
@@ -256,14 +273,16 @@ def apu_gp():
     wav.writeframes(data)
     wav.close()
 
-  if True:
+  hook_code = True
+
+  if hook_code:
 
     #FIXME: Turn off GP DSP
     apu_write_u32(NV_PAPU_GPRST, NV_PAPU_GPRST_GPRST)
 
     code_data = from_dsp(load_dsp_code("a56.out"))
     code_backup = apu_read_dsp_mem(NV_PAPU_GPPMEM, len(code_data))
-    scratch_backup = apu_read_mem(gpsaddr, 0, 0x1000)[0:len(code_data)]
+    scratch_backup = apu_read_mem(gpsaddr, 0, len(code_data))
     apu_write_dsp_mem(NV_PAPU_GPPMEM, code_data)
     apu_write_mem(gpsaddr, 0, code_data)
     print("Patched code!")
@@ -271,17 +290,37 @@ def apu_gp():
     # Re-Enable the GP DSP
     apu_write_u32(NV_PAPU_GPRST, NV_PAPU_GPRST_GPRST | NV_PAPU_GPRST_GPDSPRST)
     
-  #dump_bin(0)
-  print(apu_read_u32(NV_PAPU_GPXMEM + 0) & 0xFFFFFF)
-  time.sleep(1.0)
-  #dump_bin(1)
-  print(apu_read_u32(NV_PAPU_GPXMEM + 0) & 0xFFFFFF)
-  time.sleep(1.0)
-  print(apu_read_u32(NV_PAPU_GPXMEM + 0) & 0xFFFFFF)
-  #dump_bin(31)
-  # FIXME: Enable GP DSP
-
   if True:
+    print("Audio sniffing")
+    # Read MIXBUF even while GP DSP is off (Works pretty good)
+    print(apu_read_u32(NV_PAPU_GPXMEM + 0) & 0xFFFFFF)
+    dump_bin(0)
+    print(apu_read_u32(NV_PAPU_GPXMEM + 0) & 0xFFFFFF)
+    dump_bin(1)
+    print(apu_read_u32(NV_PAPU_GPXMEM + 0) & 0xFFFFFF)
+  else:
+    print("Audio injection")
+    # Write GP output scratch space while GP DSP is off (Does not work too good yet)
+    addr = 0x8000 # See http://xboxdevwiki.net/APU#Usage_in_DirectSound for the channel order
+    data_addr = read_u32(0x80000000 | gpsaddr + (addr // 0x1000) * 8 + 0)
+    data = bytearray()
+    for i in range(0, seconds * 48000 // 0x20):
+      chunk = bytearray()
+      for j in range(0, 0x20):
+        t = (i * 0x20 + j) / 48000
+        chunk += int.to_bytes(int(0x1FFFFF * math.sin(t * math.pi * 2 * 500)), signed=True, length=3, byteorder='little') + bytes([0])
+      data += chunk
+      while duration < i * 0x20 / 48000:
+        duration = time.time() - start
+      assert(len(chunk) == 0x20 * 4)
+      write(0x80000000 | data_addr + (addr % 0x1000) + (0x20 * 4 * i) % 0x800, chunk)
+    data = to_dsp(data)
+    print("Took " + str(duration * 1000.0) + "ms. Expected " + str(seconds * 1000.0) + "ms")
+    wav = export_wav("GP-injected.wav", channels=1, sample_width=3)
+    wav.writeframes(data)
+    wav.close()
+
+  if hook_code:
     # Check if we ran the correct code
     code_verify = apu_read_dsp_mem(NV_PAPU_GPPMEM, len(code_data))
     if code_verify != code_data:
@@ -308,12 +347,10 @@ def apu_gp():
   data = apu_read_dsp_mem(NV_PAPU_GPPMEM, 0x1000 * 4)
   wav.writeframes(data)
   wav.close()
-  #FIXME: Somewhere around here is interesting data!
-  #FIXME: Use MAXSGE
-  data = apu_read_mem(gpsaddr, 0x6000, 0x8000+0x4000)#+32*20)
-  wav = export_wav("GP-Scratch.wav")
-  wav.writeframes(data)
-  wav.close()
+
+NV_PAPU_TVL2D = 0x2054
+NV_PAPU_TVL3D = 0x2060
+NV_PAPU_TVLMP = 0x206C
 
 def apu_vp(dump_buffers = False):
   vpsgeaddr = apu_read_u32(NV_PAPU_VPSGEADDR)
@@ -552,10 +589,6 @@ def apu_vp(dump_buffers = False):
         assert(False)
         return
       next_voice = _next_voice
-
-  NV_PAPU_TVL2D = 0x2054
-  NV_PAPU_TVL3D = 0x2060
-  NV_PAPU_TVLMP = 0x206C
 
   dump_voices("2D", NV_PAPU_TVL2D)
   print("")
