@@ -130,7 +130,7 @@ int main(int argc, char* argv[]) {
   ADPCMDecoder* decoders = malloc(sizeof(ADPCMDecoder));
 
   // Allocate space for samples
-  uint8_t* sample_in[4];
+  uint32_t sample_in; //FIXME: Assert little endian machine
   int16_t* sample_out = malloc(channels * 8 * 2);
 
   // Chunk data which contains blocks of samples
@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
       // Unused byte in header
       fseek(in, 1, SEEK_CUR);
 
-      adpcm_initialize(&decoders[j], predictor, step_index);
+      adpcm_decoder_initialize(&decoders[j], predictor, step_index);
 
       // Write out predictor as first sample
       // This means you'll get 65 samples per block.
@@ -158,8 +158,11 @@ int main(int argc, char* argv[]) {
     for(unsigned int i = 0; i < channel_samples_per_block / 8; i++) {
       for(unsigned int j = 0; j < channels; j++) {
         // ADPCM has bursts of 4 bytes per channel
-        fread(sample_in, 4, 1, in);
-        adpcm_decode(&decoders[j], &sample_out[j * 8], sample_in, 8);
+        fread(&sample_in, 4, 1, in);
+        for(unsigned int l = 0; l < 8; l++) {
+          sample_out[j * 8 + l] = adpcm_decoder_step(&decoders[j], sample_in);
+          sample_in >>= 4;
+        }
       }
       // Interleave the 8 samples for PCM out
       for(unsigned int l = 0; l < 8; l++) {

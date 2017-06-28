@@ -1,6 +1,7 @@
 // See https://wiki.multimedia.cx/index.php/IMA_ADPCM for more information
 
 #include <stdint.h>
+#include <assert.h>
 
 static int8_t ima_index_table[16] = {
   -1, -1, -1, -1, 2, 4, 6, 8,
@@ -25,48 +26,40 @@ typedef struct {
   uint16_t step;
 } ADPCMDecoder;
 
-static void adpcm_initialize(ADPCMDecoder* d, int16_t predictor, uint8_t step_index) {
+static void adpcm_decoder_initialize(ADPCMDecoder* d, int16_t predictor, uint8_t step_index) {
   d->predictor = predictor;
   d->step_index = step_index;
 }
 
-static void adpcm_decode(ADPCMDecoder* d, int16_t* output, const uint8_t* input, size_t samples) {
-  for(unsigned int i = 0; i < samples; i++) {
+// The upper portion of the `nibble` argument is ignored.
+static int16_t adpcm_decoder_step(ADPCMDecoder* d, uint8_t nibble) {
 
-    // Extract low nibble, then high nibble
-    uint8_t nibble = input[i / 2];
-    if (i % 2 == 1) {
-      nibble >>= 4;
-    }
-    nibble &= 0xF;
+  // Get step and prepare index for next sample
+  d->step = ima_step_table[d->step_index];
+  d->step_index += ima_index_table[nibble & 0xF];
 
-    // Get step and prepare index for next sample
-    d->step = ima_step_table[d->step_index];
-    d->step_index += ima_index_table[nibble];
-
-    // Calculate diff
-    int32_t diff = d->step >> 3;
-    if (nibble & 1) {
-      diff += d->step >> 2;
-    }
-    if (nibble & 2) {
-      diff += d->step >> 1;
-    }
-    if (nibble & 4) {
-      diff += d->step;
-    }
-    if (nibble & 8) {
-      diff = -diff;
-    }
-
-    // Update predictor and clamp to signed 16 bit
-    d->predictor += diff;
-    if (d->predictor < -0x8000) {
-      d->predictor = -0x8000;
-    } else if (d->predictor > 0x7FFF) {
-      d->predictor = 0x7FFF;
-    }
-
-    output[i] = d->predictor;
+  // Calculate diff
+  int32_t diff = d->step >> 3;
+  if (nibble & 1) {
+    diff += d->step >> 2;
   }
+  if (nibble & 2) {
+    diff += d->step >> 1;
+  }
+  if (nibble & 4) {
+    diff += d->step;
+  }
+  if (nibble & 8) {
+    diff = -diff;
+  }
+
+  // Update predictor and clamp to signed 16 bit
+  d->predictor += diff;
+  if (d->predictor < -0x8000) {
+    d->predictor = -0x8000;
+  } else if (d->predictor > 0x7FFF) {
+    d->predictor = 0x7FFF;
+  }
+
+  return d->predictor;
 }
