@@ -4,6 +4,8 @@
 #include <assert.h>
 
 #include "adpcm.h"
+#include "adpcm_block.h"
+
 
 int main(int argc, char* argv[]) {
   if (argc != 3) {
@@ -32,6 +34,10 @@ int main(int argc, char* argv[]) {
   uint16_t channels;
   fread(&channels, 2, 1, in);
   printf("Channels: %d\n", channels);
+  if (channels != 1 && channels != 2) {
+    fprintf(stderr, "Expected mono or stereo file. Got %u channels.\n", channels);
+    return 1;
+  }
 
   uint32_t samples_per_sec;
   fread(&samples_per_sec, 4, 1, in);
@@ -126,56 +132,32 @@ int main(int argc, char* argv[]) {
 
   fwrite(&header, sizeof(header), 1, out);
 
-  // Create one decoder for each channel
-  ADPCMDecoder* decoders = malloc(sizeof(ADPCMDecoder));
-
   // Allocate space for samples
-  uint32_t sample_in; //FIXME: Assert little endian machine
-  int16_t* sample_out = malloc(channels * 8 * 2);
+  uint8_t* block = malloc(block_align);
+  int16_t* sample_out = malloc(channel_samples_per_block * channels * 2);
 
   // Chunk data which contains blocks of samples
   for(unsigned int k = 0; k < blocks; k++) {
 
-    // Block header to initialize decoders
-    for(unsigned int j = 0; j < channels; j++) {
-      int16_t predictor;
-      uint8_t step_index;
-      fread(&predictor, 2, 1, in);
-      fread(&step_index, 1, 1, in);
-  
-      // Unused byte in header
-      fseek(in, 1, SEEK_CUR);
-
-      adpcm_decoder_initialize(&decoders[j], predictor, step_index);
-
-      // Write out predictor as first sample
-      // This means you'll get 65 samples per block.
-      // The Microsoft code also does this.
-      fwrite(&predictor, 2, 1, out);
+    // Read and decode the block
+    fread(block, block_align, 1, in);
+    if (channels == 2) {
+      adpcm_decode_stereo_block(&sample_out[0], &sample_out[channel_samples_per_block], block, 0, channel_samples_per_block - 1);
+    } else {
+      adpcm_decode_mono_block(sample_out, block, 0, channel_samples_per_block - 1);
     }
 
-    // Block sample data
-    for(unsigned int i = 0; i < channel_samples_per_block / 8; i++) {
+    // Interleave the 8 samples for PCM out
+    for(unsigned int l = 0; l < channel_samples_per_block; l++) {
       for(unsigned int j = 0; j < channels; j++) {
-        // ADPCM has bursts of 4 bytes per channel
-        fread(&sample_in, 4, 1, in);
-        for(unsigned int l = 0; l < 8; l++) {
-          sample_out[j * 8 + l] = adpcm_decoder_step(&decoders[j], sample_in);
-          sample_in >>= 4;
-        }
-      }
-      // Interleave the 8 samples for PCM out
-      for(unsigned int l = 0; l < 8; l++) {
-        for(unsigned int j = 0; j < channels; j++) {
-          fwrite(&sample_out[j * 8 + l], 2, 1, out);
-        }
+        fwrite(&sample_out[j * channel_samples_per_block + l], 2, 1, out);
       }
     }
 
   }
 
   free(sample_out);
-  free(decoders);
+  free(block);
 
   fclose(in);
   fclose(out);

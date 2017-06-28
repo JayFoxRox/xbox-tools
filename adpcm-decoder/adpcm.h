@@ -22,11 +22,11 @@ static uint16_t ima_step_table[89] = {
 
 typedef struct {
   int32_t predictor;
-  uint8_t step_index;
+  int8_t step_index;
   uint16_t step;
 } ADPCMDecoder;
 
-static void adpcm_decoder_initialize(ADPCMDecoder* d, int16_t predictor, uint8_t step_index) {
+static void adpcm_decoder_initialize(ADPCMDecoder* d, int16_t predictor, int8_t step_index) {
   d->predictor = predictor;
   d->step_index = step_index;
 }
@@ -35,6 +35,11 @@ static void adpcm_decoder_initialize(ADPCMDecoder* d, int16_t predictor, uint8_t
 static int16_t adpcm_decoder_step(ADPCMDecoder* d, uint8_t nibble) {
 
   // Get step and prepare index for next sample
+  if (d->step_index < 0) {
+    d->step_index = 0;
+  } else if (d->step_index > 88) {
+    d->step_index = 88;
+  }
   d->step = ima_step_table[d->step_index];
   d->step_index += ima_index_table[nibble & 0xF];
 
