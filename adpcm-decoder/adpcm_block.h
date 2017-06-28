@@ -7,10 +7,12 @@ static int16_t adpcm_decode_block_setup(ADPCMDecoder* decoder, uint32_t word) {
 
 static int16_t* adpcm_decode_word(ADPCMDecoder* decoder, int16_t* samples, uint32_t word, int first, int last) {
   for(int i = 0; i < 8; i++) {
-    int16_t sample = adpcm_decoder_step(decoder, word);
-    word >>= 4;
-    if ((i >= first) && (i <= last)) {
-      *samples++ = sample; 
+    if (i >= first) {
+      samples++;
+    }
+    if (i <= last) {
+      *samples = adpcm_decoder_step(decoder, word);
+      word >>= 4;
     }
   }
   return samples;
@@ -21,14 +23,8 @@ static void adpcm_decode_stereo_block(int16_t* samples_l, int16_t* samples_r, co
   uint32_t* word = (uint32_t*)data;
   ADPCMDecoder decoder_l;
   ADPCMDecoder decoder_r;
-  int16_t sample_l = adpcm_decode_block_setup(&decoder_l, *word++);
-  int16_t sample_r = adpcm_decode_block_setup(&decoder_r, *word++);
-  if (first == 0) {
-    *samples_l++ = sample_l;
-    *samples_r++ = sample_r;
-    first--;
-    last--;
-  }
+  *samples_l = adpcm_decode_block_setup(&decoder_l, *word++);
+  *samples_r = adpcm_decode_block_setup(&decoder_r, *word++);
   for(unsigned int i = 0; i < 8; i++) {
     for(unsigned int j = 0; j < 2; j++) {
       if (j == 0) {
@@ -50,12 +46,7 @@ static void adpcm_decode_stereo_block(int16_t* samples_l, int16_t* samples_r, co
 static void adpcm_decode_mono_block(int16_t* samples, const uint8_t* data, unsigned int first, unsigned int last) {
   uint32_t* word = (uint32_t*)data;
   ADPCMDecoder decoder;
-  int16_t sample = adpcm_decode_block_setup(&decoder, *word++);
-  if (first == 0) {
-    *samples++ = sample;
-    first--;
-    last--;
-  }
+  *samples = adpcm_decode_block_setup(&decoder, *word++);
   for(unsigned int i = 0; i < 8; i++) {
     samples = adpcm_decode_word(&decoder, samples, *word++, first, last);
     first -= 8;
