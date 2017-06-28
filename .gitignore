@@ -4,6 +4,7 @@
 *.exe
 *.xbe
 *.txt
+!CMakeLists.txt
 *.wav
 bin/
 i386-pc-xbox/
