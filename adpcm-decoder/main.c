@@ -76,19 +76,24 @@ int main(int argc, char* argv[]) {
   fread(&chunk_size, 4, 1, in);
   printf("Data size: %u Bytes\n", chunk_size);
 
+  // Mark start of output
+  printf("\n");
+
   FILE* out = fopen(argv[2], "wb");
 
   // Calculate the number of samples:
   // * First get the number of blocks.
   // * In each block we have 4 bytes of header per channel.
   // * In each block we have 2 samples per byte.
+  // * One sample per channel from initial predictor.
+  // (= 65 samples per block).
   uint32_t blocks = chunk_size / block_align;
   printf("Duration: %u Blocks\n", blocks);
-  uint32_t samples_per_block = (block_align - 4 * channels) * 2;
+  uint32_t samples_per_block = (block_align - 4 * channels) * 2 + channels;
 
   // Check if the header lied to us
   channel_samples_per_block = samples_per_block / channels;
-  if (channel_samples_per_block != 64) {
+  if (channel_samples_per_block != 65) {
     fprintf(stderr, "Channel samples per block differs from header. Got %u.\n");
     return 1;
   }
@@ -142,6 +147,11 @@ int main(int argc, char* argv[]) {
       fseek(in, 1, SEEK_CUR);
 
       adpcm_initialize(&decoders[j], predictor, step_index);
+
+      // Write out predictor as first sample
+      // This means you'll get 65 samples per block.
+      // The Microsoft code also does this.
+      fwrite(&predictor, 2, 1, out);
     }
 
     // Block sample data
