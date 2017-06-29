@@ -5,6 +5,10 @@ def read(address, size):
   assert(False)
 def write(address, data):
   assert(False)
+def call(address, stack, registers=None):
+  assert(False)
+
+# Helper to find the target
 
 def get_xbox_address(default_port, default_host = "localhost"):
   try:
@@ -35,7 +39,7 @@ def get_xbox_address(default_port, default_host = "localhost"):
   return (HOST, PORT)
 
 try:
-  used_interface = os.environ['XBOX-IF'].strip().lower()
+  used_interface = os.environ['XBOX_IF'].strip().lower()
 except:
   used_interface = None
 
@@ -46,7 +50,7 @@ elif used_interface == 'gdb':
   print("Using gdb interface")
   from . import memory_gdb
 elif used_interface == 'nxdk-rdt':
-  print("Using NXDK-RDT interface")
+  print("Using nxdk-rdt interface")
   from . import memory_nxdk_rdt
 else:
   print("Unknown interface '" + used_interface + "'")

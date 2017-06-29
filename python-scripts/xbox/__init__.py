@@ -10,3 +10,4 @@ from .aci import * #from . import aci
 from . import apu
 from .apu_regs import *
 from . import dsp
+from . import ke
