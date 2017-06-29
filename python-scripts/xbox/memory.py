@@ -1,5 +1,10 @@
 from . import interface
 
+def read(address, size):
+  return interface.read(address, size)
+def write(address, data):
+  interface.write(address, data)
+
 def read_u8(address):
   data = interface.read(address, 1)
   return int.from_bytes(data, byteorder='little', signed=False)
