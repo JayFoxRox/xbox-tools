@@ -1,6 +1,7 @@
 from . import *
 from . import memory
 from .apu_regs import *
+from .aci import export_wav
 import math
 
 def read_u8(address):
@@ -33,7 +34,7 @@ def mem():
 
       addr |= 0x80000000
       data = memory.read(addr, length)
-      wav.memory.writeframes(data)
+      wav.writeframes(data)
     wav.close()
 
   if False:
@@ -123,7 +124,7 @@ def fifos(dump = False):
     if dump:
       data = read_mem(sge_addr, base, end - base)
       wav = export_wav(name + ".wav")
-      wav.memory.writeframes(data)
+      wav.writeframes(data)
       wav.close()
 
   # Check out FIFOs
@@ -186,7 +187,7 @@ def gp():
   print("Took " + str(duration * 1000.0) + "ms. Expected " + str(seconds * 1000.0) + "ms")
 
   wav = export_wav("GP-outmaybemaybenot.wav", channels=1, sample_width=3)
-  wav.memory.writeframes(data)
+  wav.writeframes(data)
   wav.close()
 
   # Dump out MIXBUF [should be part of VP functions imo]
@@ -205,7 +206,7 @@ def gp():
     print("Took " + str(duration * 1000.0) + "ms. Expected " + str(seconds * 1000.0) + "ms")
 
     wav = export_wav("GP-MIXBUF" + str(index) + ".wav", channels=1, sample_width=3)
-    wav.memory.writeframes(data)
+    wav.writeframes(data)
     wav.close()
 
   hook_code = True
@@ -252,7 +253,7 @@ def gp():
     data = to_dsp(data)
     print("Took " + str(duration * 1000.0) + "ms. Expected " + str(seconds * 1000.0) + "ms")
     wav = export_wav("GP-injected.wav", channels=1, sample_width=3)
-    wav.memory.writeframes(data)
+    wav.writeframes(data)
     wav.close()
 
   if hook_code:
@@ -272,15 +273,15 @@ def gp():
 
   wav = export_wav("GP-XMEM.wav")
   data = read_dsp_mem(NV_PAPU_GPXMEM, 0x1000 * 4)
-  wav.memory.writeframes(data)
+  wav.writeframes(data)
   wav.close()
   wav = export_wav("GP-YMEM.wav")
   data = read_dsp_mem(NV_PAPU_GPYMEM, 0x800 * 4)
-  wav.memory.writeframes(data)
+  wav.writeframes(data)
   wav.close()
   wav = export_wav("GP-PMEM.wav")
   data = read_dsp_mem(NV_PAPU_GPPMEM, 0x1000 * 4)
-  wav.memory.writeframes(data)
+  wav.writeframes(data)
   wav.close()
 
 
@@ -440,7 +441,7 @@ def vp(dump_buffers = False):
         map_page(paged, mapped)
 
         bytes -= len(data)
-        wav.memory.writeframes(data)
+        wav.writeframes(data)
 
         psl_start_ba_offset = 0
         psl_start_ba_page += 1
