@@ -183,18 +183,20 @@ if True:
 
   modules = GetModules()
   # FIXME: Get location of xbdm.dll
-  DmResumeThread_addr = resolve_export(35, image_base=0x0B0011000) #FIXME: Use location of xbdm.dll
+  xbdm_base = 0x0B0011000
+  DmResumeThread_addr = resolve_export(35, image_base=xbdm_base) #FIXME: Use location of xbdm.dll
   #DmResumeThread_addr = resolve_export(35) #FIXME: Use location of xbdm.dll
-  hack = "8B5424048B1A8B4A048B4208E2028A03E203668B03E2028B03E2028803E203668903E2028903894208B80000DB02C20400"
+
+  hack = "0F20C05025FFFFFEFF0F22C08B5424088B1A8B4A048B4208E2028A03E203668B03E2028B03E2028803E203668903E2028903894208580F22C0B80000DB02C20400"
   xbdm_command("setmem addr=0x" + format(DmResumeThread_addr, 'X') + " data=" + hack)
  
   #hack_bank = DmResumeThread_addr + (len(hack) // 2) # Put communication base behind the hack code [pretty shitty..]
+  hack_bank = xbdm_base # Overwrite xbdm PE header
   #hack_bank = 0xd0032FC0 # Works on console ?
-  hack_bank = 0xD004E000 - 12 # Top of stack - works in XQEMU?!
+  #hack_bank = 0xD004E000 - 12 # Top of stack - works in XQEMU?!
 
   hacked = True
   print("Hack installed, bank at 0x" + format(hack_bank, '08X'))
-  #base=0xb0011000
 
 def xbdm_hack(address, operation, data=0):
   SetMem(hack_bank, struct.pack("<III", address, operation, data))
