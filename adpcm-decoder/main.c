@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "adpcm.h"
 #include "adpcm_block.h"
 
 
@@ -136,6 +135,7 @@ int main(int argc, char* argv[]) {
   uint8_t* block = malloc(block_align);
   int16_t* sample_out = malloc(channel_samples_per_block * channels * 2);
 
+#if 0
   // Chunk data which contains blocks of samples
   for(unsigned int k = 0; k < blocks; k++) {
 
@@ -155,6 +155,28 @@ int main(int argc, char* argv[]) {
     }
 
   }
+#else
+  // Chunk data which contains blocks of samples
+  for(unsigned int k = 0; k < samples; k++) {
+
+    // Read and decode the block
+    unsigned int i = k % 65;
+    if (i == 0) {
+      fread(block, block_align, 1, in);
+    }
+    if (channels == 2) {
+      adpcm_decode_stereo_block(&sample_out[0], &sample_out[channel_samples_per_block], block, i, i);
+    } else {
+      adpcm_decode_mono_block(sample_out, block, i, i);
+    }
+
+    // Interleave the 8 samples for PCM out
+    for(unsigned int j = 0; j < channels; j++) {
+      fwrite(&sample_out[j * channel_samples_per_block], 2, 1, out);
+    }
+
+  }
+#endif
 
   free(sample_out);
   free(block);
