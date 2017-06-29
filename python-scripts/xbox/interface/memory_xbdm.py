@@ -1,28 +1,17 @@
+from .. import interface
 from . import get_xbox_address
 import socket
 import struct
 import os
 import sys
 import time
+import importlib
 
 (HOST, PORT) = get_xbox_address(731)
+connection_timeout = 0.5
 
-print("Connecting to '" + HOST + "' (Port " + str(PORT) + ")")
-connected = False
-while connected == False:
-  try:
-    xbdm = socket.create_connection((HOST, PORT), timeout=0.5)
-    connected = True
-  except socket.timeout:
-    print("Connection timeout")
-  except socket.gaierror as err:
-    sys.exit("Connection error: '" + str(err) + "'")
-  except ConnectionRefusedError:
-    print("Connection refused. Retrying in 500 ms")
-    time.sleep(0.5)
-  except:
-    sys.exit("Unknown connection error")
-  print("Retrying now")
+
+xbdm = None
 
 def xbdm_read_line():
   data = b''
@@ -37,15 +26,19 @@ def xbdm_read_line():
     data += byte
   return data
 
-def xbdm_parse_response(length=None):
-  res = xbdm_read_line()
-  status = res[0:4]
-  if status == b'200-':
-    return res
-  if status == b'201-':
-    print(status)
-    return
-  if status == b'203-':
+def xbdm_parse_response2(length=None):
+  try:
+    res = xbdm_read_line()
+    if res[3] != 45: #b'-': #FIXME: I suck at python.. how to compare a single letter to a byte string element?
+      raise
+    status = int(res[0:3])
+  except:
+    return (None, None)
+  if status == 200:
+    return (status, res)
+  if status == 201:
+    return (status, str(res, encoding='ascii'))
+  if status == 203:
     res = bytearray()
     assert(length != None)
     while True:
@@ -54,18 +47,25 @@ def xbdm_parse_response(length=None):
         break
       assert(remaining > 0)
       res += xbdm.recv(remaining)
-    return bytes(res)
-  if status == b'202-':
+    return (status, bytes(res))
+  if status == 202:
     lines = []
     while True:
       line = xbdm_read_line()
       if line == b'.':
         return lines
       lines += [line]
+    return (status, lines)
   print("Unknown status: " + str(status))
   print("from response: " + str(res))
+  #FIXME: Read remaining buffer?!
   assert(False)
+  return (status, res)
 
+#FIXME: For legacy reasons, should be updated?
+def xbdm_parse_response(length=None):
+  return xbdm_parse_response2(length)[1]
+  
 
 def xbdm_command(cmd, length=None):
   #FIXME: If type is already in bytes we just send it binary!
@@ -127,19 +127,60 @@ def SetMem(addr, data):
       cmd += format(value[i], '02X')
   xbdm_command(cmd)
 
-def read(address, size):
+
+def delay_reconnect(reason):
+  print(reason + ". Retrying in " + str(int(1000 * connection_timeout)) + " ms")
+  time.sleep(connection_timeout)
+  print("Retrying now")
+  connect()
+
+def connect():
+  global xbdm
+  while True:
+    if xbdm != None:
+      xbdm.close()
+    try:
+      xbdm = socket.create_connection((HOST, PORT), timeout=connection_timeout)
+      break
+    except socket.timeout:
+      print("Connection timeout")
+    except socket.gaierror as err:
+      sys.exit("Connection error: '" + str(err) + "'")
+    except ConnectionRefusedError:
+      delay_reconnect("Connection refused")
+    except:
+      sys.exit("Unknown connection error")
+  # Get login message
+  try:
+    (status, data) = xbdm_parse_response2()
+    if status == None:
+      raise
+    if status != 201:
+      delay_reconnect("Bad status " + str(status) + ", expected 201")
+  except:
+      delay_reconnect("Could not get expected response")
+
+print("Connecting to '" + HOST + "' (Port " + str(PORT) + ")")
+connect()
+
+
+
+def read1(address, size):
   return GetMem(address, size)
-def write(address, data):
+def write1(address, data):
   return SetMem(address, data)
 
-# Get login message
-xbdm_parse_response()
+interface.read = read1
+interface.write = write1
 
 # Hack some functions so we have better read/write access
 # See xbdm-hack.md for more information
 
 hacked = False
 if True:
+
+  from ..pe import *
+
   modules = GetModules()
   # FIXME: Get location of xbdm.dll
   DmResumeThread_addr = resolve_export(35, image_base=0x0B0011000) #FIXME: Use location of xbdm.dll
@@ -148,7 +189,8 @@ if True:
   xbdm_command("setmem addr=0x" + format(DmResumeThread_addr, 'X') + " data=" + hack)
  
   #hack_bank = DmResumeThread_addr + (len(hack) // 2) # Put communication base behind the hack code [pretty shitty..]
-  hack_bank = 0xd0032FC0#  0xD004E000 - 12 # Top of stack
+  #hack_bank = 0xd0032FC0 # Works on console ?
+  hack_bank = 0xD004E000 - 12 # Top of stack - works in XQEMU?!
 
   hacked = True
   print("Hack installed, bank at 0x" + format(hack_bank, '08X'))
@@ -173,7 +215,7 @@ def xbdm_write_16(address, data):
 def xbdm_write_32(address, data):
   xbdm_hack(address, 6, int.from_bytes(data, byteorder='little', signed=False))
 
-def read(address, size):
+def read2(address, size):
   if hacked:
     if size == 1:
       return xbdm_read_8(address)[0:1]
@@ -182,7 +224,7 @@ def read(address, size):
     if size == 4:
       return xbdm_read_32(address)[0:4]
   return GetMem(address, size)
-def write(address, data):
+def write2(address, data):
   if hacked:
     size = len(data)
     if size == 1:
@@ -192,3 +234,6 @@ def write(address, data):
     if size == 4:
       return xbdm_write_32(address, data)
   return SetMem(address, data)
+
+interface.read = read2
+interface.write = write2

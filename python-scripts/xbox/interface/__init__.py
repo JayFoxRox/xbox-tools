@@ -1,6 +1,11 @@
 import os
 import sys
 
+def read(address, size):
+  assert(False)
+def write(address, data):
+  assert(False)
+
 def get_xbox_address(default_port, default_host = "localhost"):
   try:
     XBOX = os.environ['XBOX']
@@ -30,19 +35,19 @@ def get_xbox_address(default_port, default_host = "localhost"):
   return (HOST, PORT)
 
 try:
-  interface = os.environ['XBOX-IF'].strip().lower()
+  used_interface = os.environ['XBOX-IF'].strip().lower()
 except:
-  interface = None
+  used_interface = None
 
-if interface == None or interface == 'xbdm':
+if used_interface == None or used_interface == 'xbdm':
   print("Using XBDM interface")
   from .memory_xbdm import *
-elif interface == 'gdb':
+elif used_interface == 'gdb':
   print("Using gdb interface")
   from .memory_gdb import *
-elif interface == 'nxdk-rdt':
+elif used_interface == 'nxdk-rdt':
   print("Using NXDK-RDT interface")
   from .memory_nxdk_rdt import *
 else:
-  print("Unknown interface '" + interface + "'")
+  print("Unknown interface '" + used_interface + "'")
   sys.exit(1)

@@ -1,21 +1,21 @@
-from .interfaces import *
+from . import interface
 
 def read_u8(address):
-  data = read(address, 1)
+  data = interface.read(address, 1)
   return int.from_bytes(data, byteorder='little', signed=False)
 def read_u16(address):
-  data = read(address, 2)
+  data = interface.read(address, 2)
   return int.from_bytes(data, byteorder='little', signed=False)
 def read_u32(address):
-  data = read(address, 4)
+  data = interface.read(address, 4)
   return int.from_bytes(data, byteorder='little', signed=False)
 
 def write_u8(address, value):
-  write(address, data=value.to_bytes(1, byteorder='little', signed=False))
+  interface.write(address, data=value.to_bytes(1, byteorder='little', signed=False))
 def write_u16(address, value):
-  write(address, data=value.to_bytes(2, byteorder='little', signed=False))
+  interface.write(address, data=value.to_bytes(2, byteorder='little', signed=False))
 def write_u32(address, value):
-  write(address, data=value.to_bytes(4, byteorder='little', signed=False))
+  interface.write(address, data=value.to_bytes(4, byteorder='little', signed=False))
 
 def map_page(virtual_address, mapped):
   pde_base = 0xC0300000 # Hardcoded PDE
