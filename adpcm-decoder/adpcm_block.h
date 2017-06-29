@@ -1,3 +1,5 @@
+#include "adpcm.h"
+
 static int16_t adpcm_decode_block_setup(ADPCMDecoder* decoder, uint32_t word) {
   int16_t predictor = word & 0xFFFF;
   uint8_t step_index = (word >> 16) & 0xFF;
