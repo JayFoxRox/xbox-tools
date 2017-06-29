@@ -1,4 +1,4 @@
-from .. import interface
+from xbox import interface
 from . import get_xbox_address
 import socket
 from .dbg_pb2 import *

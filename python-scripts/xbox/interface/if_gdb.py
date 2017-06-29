@@ -1,4 +1,4 @@
-from .. import interface
+from xbox import interface
 import gdb
 
 inf = gdb.selected_inferior()

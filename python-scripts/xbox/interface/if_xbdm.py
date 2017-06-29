@@ -1,4 +1,4 @@
-from .. import interface
+from xbox import interface
 from . import get_xbox_address
 import socket
 import struct
@@ -128,37 +128,43 @@ def SetMem(addr, data):
   xbdm_command(cmd)
 
 
-def delay_reconnect(reason):
+def delay_retry(reason):
   print(reason + ". Retrying in " + str(int(1000 * connection_timeout)) + " ms")
   time.sleep(connection_timeout)
   print("Retrying now")
-  connect()
 
 def connect():
   global xbdm
+  # Repeat until we are fully connected
   while True:
-    if xbdm != None:
-      xbdm.close()
+    # Wait until we get a connection
+    while True:
+      if xbdm != None:
+        xbdm.close()
+      try:
+        xbdm = socket.create_connection((HOST, PORT), timeout=connection_timeout)
+        break
+      except socket.timeout:
+        print("Connection timeout")
+      except socket.gaierror as err:
+        sys.exit("Connection error: '" + str(err) + "'")
+      except ConnectionRefusedError:
+        delay_retry("Connection refused")
+      except:
+        sys.exit("Unknown connection error")
+    # Get login message
     try:
-      xbdm = socket.create_connection((HOST, PORT), timeout=connection_timeout)
-      break
-    except socket.timeout:
-      print("Connection timeout")
-    except socket.gaierror as err:
-      sys.exit("Connection error: '" + str(err) + "'")
-    except ConnectionRefusedError:
-      delay_reconnect("Connection refused")
+      (status, data) = xbdm_parse_response2()
+      if status == None:
+        raise
+      if status != 201:
+        delay_retry("Bad status " + str(status) + ", expected 201")
+        continue
     except:
-      sys.exit("Unknown connection error")
-  # Get login message
-  try:
-    (status, data) = xbdm_parse_response2()
-    if status == None:
-      raise
-    if status != 201:
-      delay_reconnect("Bad status " + str(status) + ", expected 201")
-  except:
-      delay_reconnect("Could not get expected response")
+      delay_retry("Could not get expected response")
+      continue
+    # Leave the loop, we are connected!
+    break
 
 print("Connecting to '" + HOST + "' (Port " + str(PORT) + ")")
 connect()
