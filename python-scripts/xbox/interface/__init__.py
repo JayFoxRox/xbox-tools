@@ -41,13 +41,13 @@ except:
 
 if used_interface == None or used_interface == 'xbdm':
   print("Using XBDM interface")
-  from .memory_xbdm import *
+  from . import memory_xbdm
 elif used_interface == 'gdb':
   print("Using gdb interface")
-  from .memory_gdb import *
+  from . import memory_gdb
 elif used_interface == 'nxdk-rdt':
   print("Using NXDK-RDT interface")
-  from .memory_nxdk_rdt import *
+  from . import memory_nxdk_rdt
 else:
   print("Unknown interface '" + used_interface + "'")
   sys.exit(1)
