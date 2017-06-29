@@ -1,3 +1,5 @@
+from .memory import *
+
 def resolve_export(ordinal, image_base=0x80010000):
   #FIXME: If this is a string, look up its ordinal
   TempPtr = read_u32(image_base + 0x3C);
