@@ -6,6 +6,7 @@
 *.txt
 !CMakeLists.txt
 *.wav
+*.png
 bin/
 i386-pc-xbox/
 include/
