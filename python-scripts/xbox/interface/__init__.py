@@ -1,12 +1,7 @@
 import os
 import sys
 
-def read(address, size):
-  assert(False)
-def write(address, data):
-  assert(False)
-def call(address, stack, registers=None):
-  assert(False)
+from . import api
 
 # Helper to find the target
 

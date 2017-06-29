@@ -1,26 +1,26 @@
-from . import interface
+from .interface import api
 
 def read(address, size):
-  return interface.read(address, size)
+  return api.read(address, size)
 def write(address, data):
-  interface.write(address, data)
+  api.write(address, data)
 
 def read_u8(address):
-  data = interface.read(address, 1)
+  data = read(address, 1)
   return int.from_bytes(data, byteorder='little', signed=False)
 def read_u16(address):
-  data = interface.read(address, 2)
+  data = read(address, 2)
   return int.from_bytes(data, byteorder='little', signed=False)
 def read_u32(address):
-  data = interface.read(address, 4)
+  data = read(address, 4)
   return int.from_bytes(data, byteorder='little', signed=False)
 
 def write_u8(address, value):
-  interface.write(address, data=value.to_bytes(1, byteorder='little', signed=False))
+  write(address, data=value.to_bytes(1, byteorder='little', signed=False))
 def write_u16(address, value):
-  interface.write(address, data=value.to_bytes(2, byteorder='little', signed=False))
+  write(address, data=value.to_bytes(2, byteorder='little', signed=False))
 def write_u32(address, value):
-  interface.write(address, data=value.to_bytes(4, byteorder='little', signed=False))
+  write(address, data=value.to_bytes(4, byteorder='little', signed=False))
 
 def map_page(virtual_address, mapped):
   pde_base = 0xC0300000 # Hardcoded PDE

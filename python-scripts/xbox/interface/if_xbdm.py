@@ -1,4 +1,4 @@
-from xbox import interface
+from . import api
 from . import get_xbox_address
 import socket
 import struct
@@ -176,8 +176,8 @@ def read1(address, size):
 def write1(address, data):
   return SetMem(address, data)
 
-interface.read = read1
-interface.write = write1
+api.read = read1
+api.write = write1
 
 # Hack some functions so we have better read/write access
 # See xbdm-hack.md for more information
@@ -243,5 +243,5 @@ def write2(address, data):
       return xbdm_write_32(address, data)
   return SetMem(address, data)
 
-interface.read = read2
-interface.write = write2
+api.read = read2
+api.write = write2
