@@ -13,12 +13,13 @@ def dsp_homebrew():
   time.sleep(0.1) # FIXME: Not sure if DSP reset is synchronous, so we wait for now
 
   # Allocate some scratch space (at least 2 pages!)
+  #FIXME: Free memory after running
   page_count = 2
-  page_head = MmAllocateContiguousMemory(4096)
-  apu.write_u32(NV_PAPU_EPSADDR, MmGetPhysicalAddress(page_head))
-  page_base = MmAllocateContiguousMemory(4096 * page_count)
+  page_head = ke.MmAllocateContiguousMemory(4096)
+  apu.write_u32(NV_PAPU_EPSADDR, ke.MmGetPhysicalAddress(page_head))
+  page_base = ke.MmAllocateContiguousMemory(4096 * page_count)
   for i in range(0, page_count):
-    write_u32(page_head + i * 8 + 0, MmGetPhysicalAddress(page_base + 0x1000 * i))
+    write_u32(page_head + i * 8 + 0, ke.MmGetPhysicalAddress(page_base + 0x1000 * i))
     write_u32(page_head + i * 8 + 4, 0) # Control
   apu.write_u32(NV_PAPU_EPSMAXSGE, page_count - 1)
 
@@ -53,11 +54,11 @@ def dsp_homebrew():
   apu.write_u32(NV_PAPU_EPYMEM + 0*4, 0x000000)
 
   # Test readback
-  print("Read back X:0x" + format(apu.read_u32(NV_PAPU_EPXMEM + 0*4), '06X'))
-  print("Read back Y:0x" + format(apu.read_u32(NV_PAPU_EPYMEM + 0*4), '06X'))
+  print("Read back X[0]:0x" + format(apu.read_u32(NV_PAPU_EPXMEM + 0*4), '06X'))
+  print("Read back Y[0]:0x" + format(apu.read_u32(NV_PAPU_EPYMEM + 0*4), '06X'))
 
-  print("Read back P:0x" + format(apu.read_u32(NV_PAPU_EPPMEM + 0*4), '06X'))
-  print("Read back P:0x" + format(apu.read_u32(NV_PAPU_EPPMEM + 1*4), '06X'))
+  print("Read back P[0]:0x" + format(apu.read_u32(NV_PAPU_EPPMEM + 0*4), '06X'))
+  print("Read back P[1]:0x" + format(apu.read_u32(NV_PAPU_EPPMEM + 1*4), '06X'))
 
   # Set frame duration (?!)
   apu.write_u32(NV_PAPU_SECTL, 3 << 3)
@@ -72,7 +73,7 @@ def dsp_homebrew():
   apu.write_u32(NV_PAPU_EPXMEM + 0*4, 0x001337)
 
   # Read destination data from YMEM
-  print("Read back X:0x" + format(apu.read_u32(NV_PAPU_EPXMEM + 0*4), '06X'))
-  print("Read back Y:0x" + format(apu.read_u32(NV_PAPU_EPYMEM + 0*4), '06X'))
+  print("Read back X[0]:0x" + format(apu.read_u32(NV_PAPU_EPXMEM + 0*4), '06X'))
+  print("Read back Y[0]:0x" + format(apu.read_u32(NV_PAPU_EPYMEM + 0*4), '06X'))
 
 dsp_homebrew()
