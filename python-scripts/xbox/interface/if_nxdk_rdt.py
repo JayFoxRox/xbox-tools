@@ -11,7 +11,6 @@ def _send_simple_request(req, buffer_size=256):
   """Send a simple request, expect success"""
   rdt.send(req.SerializeToString())
   res = Response()
-  # 8 MB buffer
   res.ParseFromString(rdt.recv(buffer_size))
   if res.type != Response.OK:
     raise XboxError(res.msg)
