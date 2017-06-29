@@ -1,3 +1,4 @@
+from .. import interface
 import gdb
 
 inf = gdb.selected_inferior()
@@ -9,3 +10,5 @@ def write(address, data):
 	value = bytes(data)
 	inf.write_memory (address, value)
 
+interface.read = read
+interface.write = write
