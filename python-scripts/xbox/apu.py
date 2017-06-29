@@ -1,3 +1,4 @@
+from . import *
 import math
 
 def apu_read_u8(address):
@@ -14,6 +15,10 @@ def apu_write_u16(address, value):
 def apu_write_u32(address, value):
   write_u32(0xFE800000 + address, value)
 
+NV_PAPU_FEAV = 0x1118
+NV_PAPU_FEAV_VALUE = 0x0000FFFF
+NV_PAPU_FEAV_LST = 0x00030000
+
 NV_PAPU_VPVADDR   = 0x202C
 NV_PAPU_VPSGEADDR = 0x2030
 NV_PAPU_VPSSLADDR = 0x2034
@@ -28,6 +33,84 @@ NV_PAPU_GPSMAXSGE = 0x20D4
 NV_PAPU_GPFMAXSGE = 0x20D8
 NV_PAPU_EPSMAXSGE = 0x20DC
 NV_PAPU_EPFMAXSGE = 0x20E0
+
+NV_PAPU_EPXMEM = 0x50000
+NV_PAPU_EPYMEM = 0x56000
+NV_PAPU_EPPMEM = 0x5A000
+
+NV_PAPU_GPXMEM   = 0x30000 
+NV_PAPU_GPMIXBUF = 0x35000
+NV_PAPU_GPYMEM   = 0x36000
+NV_PAPU_GPPMEM   = 0x3A000
+
+NV_PAPU_GPRST = 0x3FFFC
+NV_PAPU_GPRST_GPRST    = (1 << 0)
+NV_PAPU_GPRST_GPDSPRST = (1 << 1)
+
+NV_PAPU_EPRST = 0x5FFFC
+NV_PAPU_EPRST_EPRST    = 0x00000001
+NV_PAPU_EPRST_EPDSPRST = 0x00000002
+
+NV_PAPU_GPOF0 = 0x3024 # 4 x 0x10 pitch
+NV_PAPU_GPIF0 = 0x3064 # 2 x 0x10 pitch
+
+NV_PAPU_EPOF0 = 0x4024 # 4 x 0x10 pitch
+NV_PAPU_EPIF0 = 0x4064 # 2 x 0x10 pitch
+
+NV_PAPU_TVL2D = 0x2054
+NV_PAPU_TVL3D = 0x2060
+NV_PAPU_TVLMP = 0x206C
+
+
+NV_PAVS_SIZE = 0x80
+
+NV_PAVS_VOICE_CFG_VBIN = 0x00
+NV_PAVS_VOICE_CFG_FMT = 0x04
+NV_PAVS_VOICE_CFG_FMT_SAMPLES_PER_BLOCK = (20,16)
+NV_PAVS_VOICE_CFG_FMT_MULTIPASS = (21,21)
+NV_PAVS_VOICE_CFG_FMT_LINKED_VOICE = (22,22)
+NV_PAVS_VOICE_CFG_FMT_PERSIST = (23,23)
+NV_PAVS_VOICE_CFG_FMT_DATA_TYPE = (24,24)
+NV_PAVS_VOICE_CFG_FMT_LOOP = (25, 25)
+NV_PAVS_VOICE_CFG_FMT_STEREO = (27,27)
+NV_PAVS_VOICE_CFG_FMT_SAMPLE_SIZE = (29,28)
+NV_PAVS_VOICE_CFG_FMT_CONTAINER_SIZE = (31,30)
+NV_PAVS_VOICE_CFG_ENV0 = 0x08
+NV_PAVS_VOICE_CFG_ENVA = 0x0C
+NV_PAVS_VOICE_CFG_ENV1 = 0x10
+NV_PAVS_VOICE_CFG_ENVF = 0x14
+NV_PAVS_VOICE_CFG_MISC = 0x18 # FIXME: Look into this
+NV_PAVS_VOICE_CFG_HRTF_TARGET = 0x1C
+NV_PAVS_VOICE_CUR_PSL_START = 0x20 # start of buffer?
+NV_PAVS_VOICE_CUR_PSH_SAMPLE = 0x24 # loop start?
+NV_PAVS_VOICE_CUR_VOLA = 0x28
+NV_PAVS_VOICE_CUR_VOLB = 0x2C
+NV_PAVS_VOICE_CUR_VOLC = 0x30
+NV_PAVS_VOICE_CUR_ECNT = 0x34
+NV_PAVS_VOICE_CUR_PRD = 0x38
+NV_PAVS_VOICE_CUR_FCA = 0x3C
+NV_PAVS_VOICE_CUR_FCB = 0x40
+NV_PAVS_VOICE_CUR_FSA = 0x44
+NV_PAVS_VOICE_CUR_FSB = 0x48
+NV_PAVS_VOICE_CUR_FSC = 0x4C
+NV_PAVS_VOICE_PAR_LFO = 0x50
+NV_PAVS_VOICE_PAR_STATE = 0x54
+NV_PAVS_VOICE_PAR_STATE_PAUSED = (1 << 18)
+NV_PAVS_VOICE_PAR_STATE_ACTIVE_VOICE = (1 << 21)
+NV_PAVS_VOICE_PAR_OFFSET = 0x58 # current playback offset
+NV_PAVS_VOICE_PAR_NEXT = 0x5C # end of buffer?
+NV_PAVS_VOICE_TAR_VOLA = 0x60
+NV_PAVS_VOICE_TAR_VOLB = 0x64
+NV_PAVS_VOICE_TAR_VOLC = 0x68
+NV_PAVS_VOICE_TAR_LFO_ENV = 0x6C
+NV_PAVS_VOICE_TAR_LFO_MOD = 0x70
+NV_PAVS_VOICE_TAR_FCA = 0x74
+NV_PAVS_VOICE_TAR_FCB = 0x78
+NV_PAVS_VOICE_TAR_PITCH_LINK = 0x7c
+NV_PAVS_VOICE_TAR_PITCH_LINK_NEXT_VOICE_HANDLE = (15,0)
+NV_PAVS_VOICE_TAR_PITCH_LINK_PITCH = (31,16)
+
+NV_PAPU_SECTL = 0x2000
 
 def apu_mem():
   def dump_mem(name, index):
@@ -139,12 +222,6 @@ def apu_fifos(dump = False):
 
   # Check out FIFOs
 
-  NV_PAPU_GPOF0 = 0x3024 # 4 x 0x10 pitch
-  NV_PAPU_GPIF0 = 0x3064 # 2 x 0x10 pitch
-
-  NV_PAPU_EPOF0 = 0x4024 # 4 x 0x10 pitch
-  NV_PAPU_EPIF0 = 0x4064 # 2 x 0x10 pitch
-
   gpfaddr = apu_read_u32(NV_PAPU_GPFADDR)
   for i in range(0,4):
     dump_fifo("GPOF" + str(i), NV_PAPU_GPOF0 + i * 0x10, gpfaddr)
@@ -160,23 +237,6 @@ def apu_fifos(dump = False):
   for i in range(0,2):
     dump_fifo("EPIF" + str(i), NV_PAPU_EPIF0 + i * 0x10, epfaddr)
   print("")
-
-# 32 bit words to 24 bit words
-def to_dsp(data):
-  assert(len(data) % 4 == 0)
-  out_data = bytearray()
-  for i in range(0, len(data) // 4):
-    out_data += data[i*4:i*4+3]
-  return bytes(out_data)
-
-# 24 bit words to 32 bit words
-def from_dsp(data, padding=0x00):
-  assert(len(data) % 3 == 0)
-  out_data = bytearray()
-  for i in range(0, len(data) // 3):
-    out_data += data[i*3:i*3+3]
-    out_data += bytes([padding])
-  return bytes(out_data)
 
 #FIXME: Keep padding byte there and instead provide conversion routines
 def apu_read_dsp_mem(addr, length):
@@ -196,37 +256,6 @@ def apu_write_dsp_mem(addr, data):
   for i in range(0, len(data) // 4):
     value = int.from_bytes(data[i*4:i*4+3], byteorder='little', signed=False)
     apu_write_u32(addr + i * 4, value)
-
-# Loads a56 assembled machine code into DSP format
-def load_dsp_code(path):
-  with open(path) as f:
-      lines = f.readlines()
-  code = bytearray()
-  curaddr = 0
-  for line in lines:
-    s = line.split()
-    assert(len(s) >= 1)
-    seg = s[0]
-    if seg == 'I' or seg == 'F':
-      break
-    assert(len(s) == 3)
-    addr = int(s[1],16)
-    data = int(s[2],16)
-    assert(addr == curaddr) # Code with gaps not supported
-    assert(data >= 0 and data <= 0xFFFFFF)
-    #print("Program data [0x" + format(addr, '04X') + "]: 0x" + format(data, '06X'))
-    code += int.to_bytes(data, length=3, byteorder='little')
-    curaddr = addr + 1
-  return code
-
-NV_PAPU_GPXMEM = 0x30000 
-NV_PAPU_GPMIXBUF = 0x35000
-NV_PAPU_GPYMEM = 0x36000
-NV_PAPU_GPPMEM = 0x3A000
-
-NV_PAPU_GPRST = 0x3FFFC
-NV_PAPU_GPRST_GPRST = (1 << 0)
-NV_PAPU_GPRST_GPDSPRST = (1 << 1)
 
 def apu_gp():
   gpsaddr = apu_read_u32(NV_PAPU_GPSADDR)
@@ -348,9 +377,6 @@ def apu_gp():
   wav.writeframes(data)
   wav.close()
 
-NV_PAPU_TVL2D = 0x2054
-NV_PAPU_TVL3D = 0x2060
-NV_PAPU_TVLMP = 0x206C
 
 def apu_vp(dump_buffers = False):
   vpsgeaddr = apu_read_u32(NV_PAPU_VPSGEADDR)
@@ -359,7 +385,6 @@ def apu_vp(dump_buffers = False):
     return read_u32(vpsgeaddr + sge_handle * 8)
 
   # Dump voices
-  NV_PAVS_SIZE = 0x80
 
   vpvaddr = apu_read_u32(NV_PAPU_VPVADDR)
   vpvaddr |= 0x80000000
@@ -373,87 +398,50 @@ def apu_vp(dump_buffers = False):
     print("")
     print("Voice: 0x" + format(voice_handle, '04X'))
 
-    NV_PAVS_VOICE_CFG_VBIN = 0x00
+
     vbin = read_u32(voice_addr + NV_PAVS_VOICE_CFG_VBIN)
-    NV_PAVS_VOICE_CFG_FMT = 0x04
     voice_fmt = read_u32(voice_addr + NV_PAVS_VOICE_CFG_FMT)
     # lots of unk stuff
-    NV_PAVS_VOICE_CFG_FMT_SAMPLES_PER_BLOCK = (20,16)
+
     print("Samples per block: " + str(mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_SAMPLES_PER_BLOCK)))
-    NV_PAVS_VOICE_CFG_FMT_MULTIPASS = (21,21)
-    NV_PAVS_VOICE_CFG_FMT_LINKED_VOICE = (22,22)
-    NV_PAVS_VOICE_CFG_FMT_PERSIST = (23,23)
-    NV_PAVS_VOICE_CFG_FMT_DATA_TYPE = (24,24)
     is_stream = (mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_DATA_TYPE) > 0)
     print("Data type: " + ("stream" if is_stream else "buffer"))
 
-    NV_PAVS_VOICE_CFG_FMT_LOOP = (25, 25)
+
     print("Loop: " + str(mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_LOOP)))
 
     # (26,26) ???
 
-    NV_PAVS_VOICE_CFG_FMT_STEREO = (27,27)
+
     is_stereo = mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_STEREO) > 0
     print("Stereo: " + str(is_stereo))
 
-    NV_PAVS_VOICE_CFG_FMT_SAMPLE_SIZE = (29,28)
     NV_PAVS_VOICE_CFG_FMT_SAMPLE_SIZE_values = [ 'U8', 'S16', 'S24', 'S32' ]
     sample_size = mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_SAMPLE_SIZE)
     print("Sample size: " + NV_PAVS_VOICE_CFG_FMT_SAMPLE_SIZE_values[sample_size])
 
-    NV_PAVS_VOICE_CFG_FMT_CONTAINER_SIZE = (31,30)
+
     NV_PAVS_VOICE_CFG_FMT_CONTAINER_SIZE_values = ['B8', 'B16', 'ADPCM', 'B32']
     container_size_values = [1, 2, 4, 4]
     container_size = mask(voice_fmt, NV_PAVS_VOICE_CFG_FMT_CONTAINER_SIZE)
     print("Container size: " + NV_PAVS_VOICE_CFG_FMT_CONTAINER_SIZE_values[container_size])
     # lots of unk stuff
 
-    # Envelope stuff
-    NV_PAVS_VOICE_CFG_ENV0 = 0x08
-    NV_PAVS_VOICE_CFG_ENVA = 0x0C
-    NV_PAVS_VOICE_CFG_ENV1 = 0x10
-    NV_PAVS_VOICE_CFG_ENVF = 0x14
-
-    # FIXME: Look into this
-    NV_PAVS_VOICE_CFG_MISC = 0x18
-
-    # HRTF
-    NV_PAVS_VOICE_CFG_HRTF_TARGET = 0x1C
-
-    NV_PAVS_VOICE_CUR_PSL_START = 0x20 # start of buffer?
     psl_start_ba = read_u32(voice_addr + NV_PAVS_VOICE_CUR_PSL_START) & 0xFFFFFF
     print("buffer start: 0x" + format(psl_start_ba, '08X'))
-    NV_PAVS_VOICE_CUR_PSH_SAMPLE = 0x24 # loop start?
+
     cur_psh_sample = read_u32(voice_addr + NV_PAVS_VOICE_CUR_PSH_SAMPLE)
     print("loop start (samples?): " + format(cur_psh_sample & 0xFFFFFF, '08X'))
-    NV_PAVS_VOICE_CUR_VOLA = 0x28
-    NV_PAVS_VOICE_CUR_VOLB = 0x2C
-    NV_PAVS_VOICE_CUR_VOLC = 0x30
-    NV_PAVS_VOICE_CUR_ECNT = 0x34
-    NV_PAVS_VOICE_CUR_PRD = 0x38
-    NV_PAVS_VOICE_CUR_FCA = 0x3C
-    NV_PAVS_VOICE_CUR_FCB = 0x40
-    NV_PAVS_VOICE_CUR_FSA = 0x44
-    NV_PAVS_VOICE_CUR_FSB = 0x48
-    NV_PAVS_VOICE_CUR_FSC = 0x4C
-    NV_PAVS_VOICE_PAR_LFO = 0x50
-    NV_PAVS_VOICE_PAR_STATE = 0x54
-    NV_PAVS_VOICE_PAR_STATE_PAUSED = (1 << 18)
-    NV_PAVS_VOICE_PAR_STATE_ACTIVE_VOICE = (1 << 21)
+
     par_state = read_u32(voice_addr + NV_PAVS_VOICE_PAR_STATE)
     print("State[Paused]: " + str(par_state & NV_PAVS_VOICE_PAR_STATE_PAUSED > 0))
     print("State[Active]: " + str(par_state & NV_PAVS_VOICE_PAR_STATE_ACTIVE_VOICE > 0))
 
-    NV_PAVS_VOICE_PAR_OFFSET = 0x58 # current playback offset
     par_offset = read_u32(voice_addr + NV_PAVS_VOICE_PAR_OFFSET) # Warning: Upper 8 bits will be 0xFF (?) on hw!
     print("current offset (samples?): 0x" + format(par_offset & 0xFFFFFF, '08X'))
-    NV_PAVS_VOICE_PAR_NEXT = 0x5C # end of buffer?
+
     ebo = read_u32(voice_addr + NV_PAVS_VOICE_PAR_NEXT) & 0xFFFFFF
     print("end of buffer (samples): 0x" + format(ebo, '08X'))
-
-    NV_PAVS_VOICE_TAR_VOLA = 0x60
-    NV_PAVS_VOICE_TAR_VOLB = 0x64
-    NV_PAVS_VOICE_TAR_VOLC = 0x68
 
     cur_vola = read_u32(voice_addr + NV_PAVS_VOICE_CUR_VOLA)
     cur_volb = read_u32(voice_addr + NV_PAVS_VOICE_CUR_VOLB)
@@ -501,15 +489,6 @@ def apu_vp(dump_buffers = False):
     print("VBIN   " + bins)
     print("CUR_VOL" + cur_vols)
     print("TAR_VOL" + tar_vols)
-
-    NV_PAVS_VOICE_TAR_LFO_ENV = 0x6C
-    NV_PAVS_VOICE_TAR_LFO_MOD = 0x70
-    NV_PAVS_VOICE_TAR_FCA = 0x74
-    NV_PAVS_VOICE_TAR_FCB = 0x78
-
-    NV_PAVS_VOICE_TAR_PITCH_LINK = 0x7c
-    NV_PAVS_VOICE_TAR_PITCH_LINK_NEXT_VOICE_HANDLE = (15,0)
-    NV_PAVS_VOICE_TAR_PITCH_LINK_PITCH = (31,16)
 
     tar_pitch_link = read_u32(voice_addr + NV_PAVS_VOICE_TAR_PITCH_LINK)
     pitch = mask(tar_pitch_link, NV_PAVS_VOICE_TAR_PITCH_LINK_PITCH)
@@ -570,9 +549,6 @@ def apu_vp(dump_buffers = False):
 
   # This dumps information about the active voice, usually not of interest
   if False:
-    NV_PAPU_FEAV = 0x1118
-    NV_PAPU_FEAV_VALUE = 0x0000FFFF
-    NV_PAPU_FEAV_LST = 0x00030000
     NV_PAPU_FEAV_LST_values = ['INHERIT', '2D_TOP', '3D_TOP', 'MP_TOP']
     feav = apu_read_u32(NV_PAPU_FEAV)
     active_voice = feav & NV_PAPU_FEAV_VALUE

@@ -1,16 +1,12 @@
+#!/usr/bin/env python3
+
+# Run this from a clean Xbox environment (= not while a game is running)
+# NXDK-RDT is a good environment
+
+import xbox
+
 def dsp_homebrew():
   #FIXME: Pass dsp object which provides all the device details and registers instead
-
-  NV_PAPU_EPXMEM = 0x50000
-  NV_PAPU_EPYMEM = 0x56000
-  NV_PAPU_EPPMEM = 0x5A000
-
-  NV_PAPU_EPSADDR = 0x2048
-  NV_PAPU_EPSMAXSGE = 0x20DC
-
-  NV_PAPU_EPRST = 0x5FFFC
-  NV_PAPU_EPRST_EPRST    = 0x00000001
-  NV_PAPU_EPRST_EPDSPRST = 0x00000002
 
   # Disable DSP
   dsp_write_u32(NV_PAPU_EPRST, NV_PAPU_EPRST_EPRST) # If this is zero, the EP will not allow reads/writes to memory?!
@@ -26,11 +22,20 @@ def dsp_homebrew():
     write_u32(page_head + i * 8 + 4, 0) # Control
   dsp_write_u32(NV_PAPU_EPSMAXSGE, page_count - 1)
 
-  # See dsp_homebrew.inc
   # It was assembled using `a56 loop.inc && toomf < a56.out`.
   # The resulting code was then copied here.
   # `a56` (inc. `toomf`) can be found at: http://www.zdomain.com/a56.html
-  code = "56F000 000000 5E7000 000000 0AF080 000000"
+  try:
+    raise #FIXME: Test this codepath
+    code = dsp.assemble("""
+    ; Simple test program
+    start
+      move x:$000000, a
+      move a, y:$000000
+      jmp start
+    """)
+  except:
+    code = "56F000 000000 5E7000 000000 0AF080 000000"
 
   # Write code to PMEM
   code_words = code.split()
@@ -55,7 +60,6 @@ def dsp_homebrew():
   print("Read back P:0x" + format(dsp_read_u32(NV_PAPU_EPPMEM + 1*4), '06X'))
 
   # Set frame duration (?!)
-  NV_PAPU_SECTL = 0x2000
   dsp_write_u32(NV_PAPU_SECTL, 3 << 3)
 
   # Enable DSP
