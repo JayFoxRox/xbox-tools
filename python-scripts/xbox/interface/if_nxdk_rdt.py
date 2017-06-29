@@ -1,4 +1,4 @@
-from xbox import interface
+from . import api
 from . import get_xbox_address
 import socket
 from .dbg_pb2 import *
@@ -42,6 +42,6 @@ def call(address, stack, registers=None):
   out_registers['eax'] = res.address
   return out_registers
 
-interface.read = read
-interface.write = write
-interface.call = call
+api.read = read
+api.write = write
+api.call = call
