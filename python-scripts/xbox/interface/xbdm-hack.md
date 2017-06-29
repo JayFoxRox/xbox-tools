@@ -11,9 +11,9 @@ mov cr0, eax
 
 # Get arguments
 mov edx, [esp+8]        # Get communication address
-mov ebx, [edx+0]				# Get address
-mov ecx, [edx+4]				# Get operation
-mov eax, [edx+8]				# Data; Might need this for writes
+mov ebx, [edx+0]        # Get address
+mov ecx, [edx+4]        # Get operation
+mov eax, [edx+8]        # Data; Might need this for writes
 
 read_u8:
 loop read_u16 # 1
@@ -40,7 +40,7 @@ loop cleanup # 6
 mov [ebx], eax
 
 cleanup:
-mov [edx+8], eax				# Data; Might need this for reads
+mov [edx+8], eax        # Data; Might need this for reads
 pop eax                 # Restore cr0 (memory protection)
 mov cr0, eax
 mov eax, 0x02DB0000     # Return Success (lower bits describe the response type)
