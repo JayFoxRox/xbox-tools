@@ -1,21 +1,21 @@
 from . import *
+from . import memory
 from .helper import better_wave
 import time
-import pyaudio
 
-def aci_read_u8(address):
-  return read_u8(0xFEC00000 + address)
-def aci_read_u16(address):
-  return read_u16(0xFEC00000 + address)
-def aci_read_u32(address):
-  return read_u32(0xFEC00000 + address)
+def read_u8(address):
+  return memory.read_u8(0xFEC00000 + address)
+def read_u16(address):
+  return memory.read_u16(0xFEC00000 + address)
+def read_u32(address):
+  return memory.read_u32(0xFEC00000 + address)
 
-def aci_write_u8(address, value):
-  write_u8(0xFEC00000 + address, value)
-def aci_write_u16(address, value):
-  write_u16(0xFEC00000 + address, value)
-def aci_write_u32(address, value):
-  write_u32(0xFEC00000 + address, value)
+def write_u8(address, value):
+  memory.write_u8(0xFEC00000 + address, value)
+def write_u16(address, value):
+  memory.write_u16(0xFEC00000 + address, value)
+def write_u32(address, value):
+  memory.write_u32(0xFEC00000 + address, value)
 
 
 def export_wav(path, channels=2, sample_width=2, sample_rate=48000, fmt=better_wave.WAVE_FORMAT_PCM):
@@ -27,43 +27,42 @@ def export_wav(path, channels=2, sample_width=2, sample_rate=48000, fmt=better_w
   wav.setframerate(sample_rate)
   return wav
 
-def aci_ac97_status():
-  print("global control=0x" + format(aci_read_u32(0x12C), '08X'))
-  print("global status=0x" + format(aci_read_u32(0x130), '08X'))
+def ac97_status():
+  print("global control=0x" + format(read_u32(0x12C), '08X'))
+  print("global status=0x" + format(read_u32(0x130), '08X'))
   def dump_buffers(addr,name):
-    descriptor = aci_read_u32(addr)
+    descriptor = read_u32(addr)
     print("??? desc is p 0x" + format(descriptor, '08X'))
     descriptor |= 0x80000000
     # FIXME: Download all descriptors in one packet and then parse here
     wav = export_wav(format(addr, 'X') + ".wav")
     for i in range(0, 32):
-      addr = read_u32(descriptor + i * 8 + 0)
-      length = read_u16(descriptor + i * 8 + 4)
-      control = read_u16(descriptor + i * 8 + 6)
+      addr = memory.read_u32(descriptor + i * 8 + 0)
+      length = memory.read_u16(descriptor + i * 8 + 4)
+      control = memory.read_u16(descriptor + i * 8 + 6)
       if (addr != 0) or (length != 0) or (control != 0):
         print(str(i) + ": 0x" + format(addr, '08X') + " (" + str(length) + " samples); control: 0x" + format(control, '04X'))
         addr |= 0x80000000
-        data = read(addr, length * 2)
+        data = memory.read(addr, length * 2)
         wav.writeframes(data)
     wav.close()
-    print("CIV=0x" + format(aci_read_u8(addr + 0x4), '02X'))
-    print("LVI=0x" + format(aci_read_u8(addr + 0x5), '02X'))
-    print("SR=0x" + format(aci_read_u16(addr + 0x6), '04X'))
-    print("pos=0x" + format(aci_read_u16(addr + 0x8), '04X'))
-    print("piv=0x" + format(aci_read_u16(addr + 0xA), '04X'))
-    print("CR=0x" + format(aci_read_u8(addr + 0xB), '02X'))
+    print("CIV=0x" + format(read_u8(addr + 0x4), '02X'))
+    print("LVI=0x" + format(read_u8(addr + 0x5), '02X'))
+    print("SR=0x" + format(read_u16(addr + 0x6), '04X'))
+    print("pos=0x" + format(read_u16(addr + 0x8), '04X'))
+    print("piv=0x" + format(read_u16(addr + 0xA), '04X'))
+    print("CR=0x" + format(read_u8(addr + 0xB), '02X'))
   dump_buffers(0x110, "pcm.wav")
   dump_buffers(0x170, "spdif.wav")
 
-def aci_ac97_trace():
-  descriptor = aci_read_u32(0x110)
+def TraceAC97(callback):
+  descriptor = read_u32(0x110)
   print("??? desc is p 0x" + format(descriptor, '08X'))
   descriptor |= 0x80000000
-  wav = export_wav("pcm_trace.wav")
   for i in range(0, 32):
-    addr = read_u32(descriptor + i * 8 + 0)
-    length = read_u16(descriptor + i * 8 + 4)
-    control = read_u16(descriptor + i * 8 + 6)
+    addr = memory.read_u32(descriptor + i * 8 + 0)
+    length = memory.read_u16(descriptor + i * 8 + 4)
+    control = memory.read_u16(descriptor + i * 8 + 6)
     if (addr != 0) or (length != 0) or (control != 0):
       print(str(i) + ": 0x" + format(addr, '08X') + " (" + str(length) + " samples); control: 0x" + format(control, '04X'))
       addr |= 0x80000000
@@ -88,7 +87,7 @@ def aci_ac97_trace():
         min_non_delta = 0
         t_last = None
         while(True):
-          data = read(addr, buffer_size)
+          data = memory.read(addr, buffer_size)
           diff = ""
           blocks = 165
           block_size = buffer_size / blocks
@@ -130,15 +129,13 @@ def aci_ac97_trace():
           took = current_milli_time() - start
           #print("Took " + str(took) + " / " + str(time_for_buffer) + " ms")
 
-      pya = pyaudio.PyAudio()
-      stream = pya.open(format=pya.get_format_from_width(width=2), channels=2, rate=int(sample_rate), output=True)
 
       # This is a poc where I try to find out when buffers are written
       #FIXME: This should sit somewhere in the streaming loop so we can resync
       print("Waiting for playback")
       last = None
       while True:
-        new = read_u32(addr)
+        new = memory.read_u32(addr)
         if last != None and last != new:
           print("Playback started!")
           time.sleep(time_for_buffer * 0.5 / 1000.0) # Give it another half buffer headstart
@@ -148,23 +145,24 @@ def aci_ac97_trace():
   
       underruns = 0
       offset = 512 # Hardware buffer starts at 512 byte offset
-      for i in range(0, 5000):
+      
+      while True:
         offset %= buffer_size
         start = current_milli_time()
 
         streamed_data = bytearray()
 
         to_end = buffer_size - offset
-        data = read(addr + offset, min(chunk_size, to_end))
+        data = memory.read(addr + offset, min(chunk_size, to_end))
         remaining = chunk_size - len(data)
         if remaining > 0:
-          data += read(addr, remaining)
+          data += memory.read(addr, remaining)
 
         offset += chunk_size
 
-        # Write output
-        stream.write(bytes(data))
-        wav.writeframes(data)
+        # Handle output in callback
+        if callback(bytes(data)):
+          break
 
         took = current_milli_time() - start
         remain = time_per_chunk - took
@@ -179,8 +177,4 @@ def aci_ac97_trace():
           #print("too slow!")
 
       print("Had " + str(underruns) + " underruns")
-
-      stream.stop_stream()
-      stream.close()
-
 
