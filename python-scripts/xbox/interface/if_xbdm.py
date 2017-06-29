@@ -185,7 +185,7 @@ interface.write = write1
 hacked = False
 if True:
 
-  from ..pe import *
+  from xbox.pe import *
 
   modules = GetModules()
   # FIXME: Get location of xbdm.dll
