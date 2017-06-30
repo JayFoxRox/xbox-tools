@@ -146,6 +146,7 @@ def TraceAC97(callback):
       underruns = 0
       offset = 512 # Hardware buffer starts at 512 byte offset
       
+      first_start = time.time()
       while True:
         offset %= buffer_size
         start = current_milli_time()
@@ -161,7 +162,7 @@ def TraceAC97(callback):
         offset += chunk_size
 
         # Handle output in callback
-        if callback(bytes(data)):
+        if callback(time.time() - first_start, bytes(data)):
           break
 
         took = current_milli_time() - start

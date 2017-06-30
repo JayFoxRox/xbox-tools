@@ -5,9 +5,8 @@ import subprocess
 # 32 bit words to 24 bit words
 def to24(data):
   assert(len(data) % 4 == 0)
-  out_data = bytearray()
-  for i in range(0, len(data) // 4):
-    out_data += data[i*4:i*4+3]
+  out_data = bytearray(data)
+  del out_data[3::4]
   return bytes(out_data)
 
 # 24 bit words to 32 bit words

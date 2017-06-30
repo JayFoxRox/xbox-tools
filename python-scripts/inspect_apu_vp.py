@@ -87,7 +87,6 @@ def ListVoices(voice, name):
   print("Sample size: " + NV_PAVS_VOICE_CFG_FMT_SAMPLE_SIZE_values[sample_size])
 
   NV_PAVS_VOICE_CFG_FMT_CONTAINER_SIZE_values = ['B8', 'B16', 'ADPCM', 'B32']
-  container_size_values = [1, 2, 4, 4]
   container_size = ReadVoiceField(voice, 'CFG_FMT', 'CONTAINER_SIZE', show=False)
   print("Container size: " + NV_PAVS_VOICE_CFG_FMT_CONTAINER_SIZE_values[container_size])
   # lots of unk stuff
@@ -161,17 +160,17 @@ def ListVoices(voice, name):
     # FIXME: Move to apu.py with callbacks?
     def DumpVoiceBuffer(path):
       #FIXME: Respect samples per block
+      #FIXME: Rewrite, this is overall pretty horrible
       channels = 2 if is_stereo else 1
+      container_size_values = [1, 2, 4, 4]
       in_sample_size = container_size_values[container_size]
       fmt = 0x0011 if container_size == 2 else 0x0001
       wav = aci.export_wav(path, channels, in_sample_size, freq, fmt)
 
       samples = ebo + 1
       if fmt == 0x0011: # Check for ADPCM
-        #FIXME: Is this correct?
-        #FIXME: Rounding issues?
-        block_size =  0x24 * channels
-        bytes = samples // 64 * block_size
+        block_size = 36 * channels
+        bytes = samples // 65 * block_size
       else:
         block_size = in_sample_size * channels
         bytes = samples * block_size
