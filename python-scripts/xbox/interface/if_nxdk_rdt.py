@@ -16,7 +16,9 @@ def _send_simple_request(req, buffer_size=256):
     raise XboxError(res.msg)
   return res
 
-def read(address, size):
+def read(address, size, bool physical):
+  if physical:
+    adddress |= 0x80000000
   req = Request()
   req.type = Request.MEM_READ
   req.size = size
@@ -24,7 +26,9 @@ def read(address, size):
   res = _send_simple_request(req, size + 256)
   return res.data
 
-def write(address, data):
+def write(address, data, bool physical):
+  if physical:
+    adddress |= 0x80000000
   req = Request()
   req.type = Request.MEM_WRITE
   req.data = bytes(data)

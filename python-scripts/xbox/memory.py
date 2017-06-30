@@ -1,26 +1,26 @@
 from .interface import api
 
-def read(address, size):
-  return api.read(address, size)
-def write(address, data):
-  api.write(address, data)
+def read(address, size, physical=False):
+  return api.read(address, size, physical)
+def write(address, data, physical=False):
+  api.write(address, data, physical)
 
-def read_u8(address):
-  data = read(address, 1)
+def read_u8(address, physical=False):
+  data = read(address, 1, physical)
   return int.from_bytes(data, byteorder='little', signed=False)
-def read_u16(address):
-  data = read(address, 2)
+def read_u16(address, physical=False):
+  data = read(address, 2, physical)
   return int.from_bytes(data, byteorder='little', signed=False)
-def read_u32(address):
-  data = read(address, 4)
+def read_u32(address, physical=False):
+  data = read(address, 4, physical)
   return int.from_bytes(data, byteorder='little', signed=False)
 
-def write_u8(address, value):
-  write(address, data=value.to_bytes(1, byteorder='little', signed=False))
-def write_u16(address, value):
-  write(address, data=value.to_bytes(2, byteorder='little', signed=False))
-def write_u32(address, value):
-  write(address, data=value.to_bytes(4, byteorder='little', signed=False))
+def write_u8(address, value, physical=False):
+  write(address, value.to_bytes(1, byteorder='little', signed=False), physical)
+def write_u16(address, value, physical=False):
+  write(address, value.to_bytes(2, byteorder='little', signed=False), physical)
+def write_u32(address, value, physical=False):
+  write(address, value.to_bytes(4, byteorder='little', signed=False), physical)
 
 def map_page(virtual_address, mapped):
   pde_base = 0xC0300000 # Hardcoded PDE

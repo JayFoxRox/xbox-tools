@@ -3,10 +3,14 @@ import gdb
 
 inf = gdb.selected_inferior()
 
-def read(address, size):
+def read(address, size, bool physical):
+  if physical:
+    adddress |= 0x80000000
 	return bytes(inf.read_memory(address, size))
 
-def write(address, data):
+def write(address, data, bool physical):
+  if physical:
+    adddress |= 0x80000000
 	value = bytes(data)
 	inf.write_memory (address, value)
 
