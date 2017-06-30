@@ -170,10 +170,13 @@ print("Connecting to '" + HOST + "' (Port " + str(PORT) + ")")
 connect()
 
 
+# Used during bootstrap only!
 
-def read1(address, size):
+def read1(address, size, physical):
+  assert(physical == False);
   return GetMem(address, size)
-def write1(address, data):
+def write1(address, data, physical):
+  assert(physical == False);
   return SetMem(address, data)
 
 api.read = read1
@@ -223,7 +226,9 @@ def xbdm_write_16(address, data):
 def xbdm_write_32(address, data):
   xbdm_hack(address, 6, int.from_bytes(data, byteorder='little', signed=False))
 
-def read2(address, size):
+def read2(address, size, physical):
+  if physical:
+    address |= 0x80000000
   if hacked:
     if size == 1:
       return xbdm_read_8(address)[0:1]
@@ -232,7 +237,9 @@ def read2(address, size):
     if size == 4:
       return xbdm_read_32(address)[0:4]
   return GetMem(address, size)
-def write2(address, data):
+def write2(address, data, physical):
+  if physical:
+    address |= 0x80000000
   if hacked:
     size = len(data)
     if size == 1:
