@@ -1,10 +1,21 @@
 #!/usr/bin/env python3
 
-# Takes a screenshot
+# Assuming DirectSound:
+# - We get 2 bytes per sample * 2 channels
+# - We get 1024 bytes at a time = 256 samples
+# - We run at 48000 Hz
+#
+# 256 / (480000 Hz) = 5.333 ms
+#
+# So at most you can spend 5.333 ms in the `callback` below.
+# However, consider network and API overhead. So try to spend time wisely.
+
+seconds = 10.0
+
 
 from xbox import *
 
-# Start tracing
+# Open outputs
 wav = aci.export_wav("pcm_trace.wav")
 try:
   import pyaudio
@@ -15,30 +26,16 @@ except ImportError:
   stream = None
 
 # Define the handler which will do the output.
-#
-# Assuming DirectSound:
-# - We get 2 bytes per sample * 2 channels
-# - We get 1024 bytes at a time = 256 samples
-# - We run at 48000 Hz
-#
-# 256 / (480000 Hz) = 0.533 ms
-#
-# So at most you can spend 0.533 ms here. However, there will be network
-# and API overhead. So try to spend time wisely
-
-duration = 0
-def callback(data):
-  global duration
+def callback(duration, data):
   if stream != None:
     stream.write(data)
   wav.writeframes(data)
-  duration += len(data) // (2 * 2)
-  return duration >= 10.0 * 48000 # Checks for 10 seconds
+  return duration >= seconds
 
 # Start tracing
 aci.TraceAC97(callback)
 
-# Stop and close all streams
+# Stop and close all outputs
 if stream != None:
   stream.stop_stream()
   stream.close()

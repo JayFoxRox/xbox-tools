@@ -3,6 +3,7 @@ from . import memory
 from .apu_regs import *
 from .aci import export_wav
 import math
+import time
 
 def read_u8(address):
   return memory.read_u8(0xFE800000 + address)
@@ -190,84 +191,7 @@ def gp():
   wav.writeframes(data)
   wav.close()
 
-  # Dump out MIXBUF [should be part of VP functions imo]
-  #FIXME: Support dumping multiple bins at once?
-  def dump_bin(index, seconds=2):
-    # MIXBUF is 0x400 = 32 bins * 0x20 words which contain 48kHz 24-bit PCM
-    data = bytearray()
-
-    start = time.time()
-    duration = 0
-    for i in range(0, seconds * 48000 // 0x20):
-      data += read_dsp_mem(NV_PAPU_GPMIXBUF + index * 0x20 * 4, 0x20 * 4)
-      while duration < i * 0x20 / 48000:
-        duration = time.time() - start
-    data = to_dsp(data)
-    print("Took " + str(duration * 1000.0) + "ms. Expected " + str(seconds * 1000.0) + "ms")
-
-    wav = export_wav("GP-MIXBUF" + str(index) + ".wav", channels=1, sample_width=3)
-    wav.writeframes(data)
-    wav.close()
-
-  hook_code = True
-
-  if hook_code:
-
-    #FIXME: Turn off GP DSP
-    write_u32(NV_PAPU_GPRST, NV_PAPU_GPRST_GPRST)
-
-    code_data = from_dsp(load_dsp_code("a56.out"))
-    code_backup = read_dsp_mem(NV_PAPU_GPPMEM, len(code_data))
-    scratch_backup = read_mem(gpsaddr, 0, len(code_data))
-    write_dsp_mem(NV_PAPU_GPPMEM, code_data)
-    write_mem(gpsaddr, 0, code_data)
-    print("Patched code!")
-
-    # Re-Enable the GP DSP
-    write_u32(NV_PAPU_GPRST, NV_PAPU_GPRST_GPRST | NV_PAPU_GPRST_GPDSPRST)
-    
-  if True:
-    print("Audio sniffing")
-    # memory.read MIXBUF even while GP DSP is off (Works pretty good)
-    print(read_u32(NV_PAPU_GPXMEM + 0) & 0xFFFFFF)
-    dump_bin(0)
-    print(read_u32(NV_PAPU_GPXMEM + 0) & 0xFFFFFF)
-    dump_bin(1)
-    print(read_u32(NV_PAPU_GPXMEM + 0) & 0xFFFFFF)
-  else:
-    print("Audio injection")
-    # memory.write GP output scratch space while GP DSP is off (Does not work too good yet)
-    addr = 0x8000 # See http://xboxdevwiki.net/APU#Usage_in_DirectSound for the channel order
-    data_addr = memory.read_u32(0x80000000 | gpsaddr + (addr // 0x1000) * 8 + 0)
-    data = bytearray()
-    for i in range(0, seconds * 48000 // 0x20):
-      chunk = bytearray()
-      for j in range(0, 0x20):
-        t = (i * 0x20 + j) / 48000
-        chunk += int.to_bytes(int(0x1FFFFF * math.sin(t * math.pi * 2 * 500)), signed=True, length=3, byteorder='little') + bytes([0])
-      data += chunk
-      while duration < i * 0x20 / 48000:
-        duration = time.time() - start
-      assert(len(chunk) == 0x20 * 4)
-      memory.write(0x80000000 | data_addr + (addr % 0x1000) + (0x20 * 4 * i) % 0x800, chunk)
-    data = to_dsp(data)
-    print("Took " + str(duration * 1000.0) + "ms. Expected " + str(seconds * 1000.0) + "ms")
-    wav = export_wav("GP-injected.wav", channels=1, sample_width=3)
-    wav.writeframes(data)
-    wav.close()
-
-  if hook_code:
-    # Check if we ran the correct code
-    code_verify = read_dsp_mem(NV_PAPU_GPPMEM, len(code_data))
-    if code_verify != code_data:
-      print("Oops! Code was not written successfully!")
-
-    # Resume normal DSP operation
-    write_u32(NV_PAPU_GPRST, NV_PAPU_GPRST_GPRST)
-    write_dsp_mem(NV_PAPU_GPPMEM, code_backup)
-    write_mem(gpsaddr, 0, scratch_backup)
-    print("Recovered!")
-    write_u32(NV_PAPU_GPRST, NV_PAPU_GPRST_GPRST | NV_PAPU_GPRST_GPDSPRST)
+  ##FIXME: Code removed here
 
   # Dump GP Memory (aside from MIXBUF)
 
@@ -283,6 +207,75 @@ def gp():
   data = read_dsp_mem(NV_PAPU_GPPMEM, 0x1000 * 4)
   wav.writeframes(data)
   wav.close()
+
+def TraceMIXBUF(bin_index, callback):
+  assert(bin_index >= 0)
+  assert(bin_index <= 31)
+
+  #FIXME: Support dumping multiple bins at once?
+  # MIXBUF is 0x400 = 32 bins * 0x20 words which contain 48kHz 24-bit PCM
+  start = time.time()
+  duration = 0
+  step = 1
+  while(True):
+    data = read_dsp_mem(NV_PAPU_GPMIXBUF + bin_index * 0x20 * 4, 0x20 * 4)
+    # Handle output in callback
+    if callback(duration, bytes(data)):
+      break
+    while duration < step * 0x20 / 48000:
+      duration = time.time() - start
+    step += 1
+
+#FIXME: Untested since moving code around, probably broken!
+#       Use 'tiny-gp.inc' as DSP code to avoid running DirectSound
+def InjectGPOutput(hook_code = False):
+  if hook_code:
+    #FIXME: Move code to turn off / hijack DSP into other functions
+    #FIXME: Turn off GP DSP
+    write_u32(NV_PAPU_GPRST, NV_PAPU_GPRST_GPRST)
+
+    code_data = from_dsp(load_dsp_code("a56.out"))
+    code_backup = read_dsp_mem(NV_PAPU_GPPMEM, len(code_data))
+    scratch_backup = read_mem(gpsaddr, 0, len(code_data))
+    write_dsp_mem(NV_PAPU_GPPMEM, code_data)
+    write_mem(gpsaddr, 0, code_data)
+    print("Patched code!")
+
+    # Re-Enable the GP DSP
+    write_u32(NV_PAPU_GPRST, NV_PAPU_GPRST_GPRST | NV_PAPU_GPRST_GPDSPRST)
+  
+  # memory.write GP output scratch space while GP DSP is off (Does not work too good yet)
+  addr = 0x8000 # See http://xboxdevwiki.net/APU#Usage_in_DirectSound for the channel order
+  data_addr = memory.read_u32(0x80000000 | gpsaddr + (addr // 0x1000) * 8 + 0)
+  data = bytearray()
+  for i in range(0, seconds * 48000 // 0x20):
+    chunk = bytearray()
+    for j in range(0, 0x20):
+      t = (i * 0x20 + j) / 48000
+      chunk += int.to_bytes(int(0x1FFFFF * math.sin(t * math.pi * 2 * 500)), signed=True, length=3, byteorder='little') + bytes([0])
+    data += chunk
+    while duration < i * 0x20 / 48000:
+      duration = time.time() - start
+    assert(len(chunk) == 0x20 * 4)
+    memory.write(0x80000000 | data_addr + (addr % 0x1000) + (0x20 * 4 * i) % 0x800, chunk)
+  data = to_dsp(data)
+  print("Took " + str(duration * 1000.0) + "ms. Expected " + str(seconds * 1000.0) + "ms")
+  wav = export_wav("GP-injected.wav", channels=1, sample_width=3)
+  wav.writeframes(data)
+  wav.close()
+
+  if hook_code:
+    # Check if we ran the correct code
+    code_verify = read_dsp_mem(NV_PAPU_GPPMEM, len(code_data))
+    if code_verify != code_data:
+      print("Oops! Code was not written successfully!")
+
+    # Resume normal DSP operation
+    write_u32(NV_PAPU_GPRST, NV_PAPU_GPRST_GPRST)
+    write_dsp_mem(NV_PAPU_GPPMEM, code_backup)
+    write_mem(gpsaddr, 0, scratch_backup)
+    print("Recovered!")
+    write_u32(NV_PAPU_GPRST, NV_PAPU_GPRST_GPRST | NV_PAPU_GPRST_GPDSPRST)
 
 def InvalidateCache(offset = None):
   pass #FIXME: Auto invalidate on writes near offset with apu functions
@@ -300,15 +293,19 @@ def ReadSGE(offset, length):
     return memory.read_u32(vpsgeaddr + sge_handle * 8, True)
   out = bytearray()
   while length > 0:
-    page_base = vp_sge(offset // 0x1000)
-    paged = page_base + offset % 1000
-    in_page = 0x1000 - (offset % 0x1000)
+    page_index = offset // 0x1000
+    offset_in_page = offset % 0x1000
+    page_base = vp_sge(page_index)
+    paged = page_base + offset_in_page
+    in_page = 0x1000 - offset_in_page
+    chunk_size = min(in_page, length)
     # FIXME: Somehow handle this permission stuff differently
     mapped = map_page(0x80000000 | paged, True)  
-    data = memory.read(paged, min(in_page, length), True)
+    data = memory.read(paged, chunk_size, True)
     map_page(0x80000000 | paged, mapped)
     out += data
-    length -= len(data)
+    length -= chunk_size
+    offset += chunk_size
   return bytes(out)
 
 def ReadVoice(voice_handle, field_offset, field_mask):
