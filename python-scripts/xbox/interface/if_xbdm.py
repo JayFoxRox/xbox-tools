@@ -145,7 +145,7 @@ def connect():
         xbdm = socket.create_connection((HOST, PORT), timeout=connection_timeout)
         break
       except socket.timeout:
-        print("Connection timeout")
+        print("Connection timeout. Retrying")
       except socket.gaierror as err:
         sys.exit("Connection error: '" + str(err) + "'")
       except ConnectionRefusedError:
