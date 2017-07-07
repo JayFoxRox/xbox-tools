@@ -5,6 +5,9 @@
 
 from xbox import *
 
+import sys
+import time
+
 def dsp_homebrew():
   #FIXME: Pass dsp object which provides all the device details and registers instead
 
@@ -26,26 +29,38 @@ def dsp_homebrew():
   # It was assembled using `a56 loop.inc && toomf < a56.out`.
   # The resulting code was then copied here.
   # `a56` (inc. `toomf`) can be found at: http://www.zdomain.com/a56.html
-  try:
-    raise #FIXME: Test this codepath
-    code = dsp.assemble("""
+  if True:
+    print("Starting assembler")
+    #raise #FIXME: Test this codepath
+    data = dsp.assemble("""
     ; Simple test program
     start
       move x:$000000, a
       move a, y:$000000
       jmp start
     """)
-  except:
+    print("Using assembler result!")
+  else:
     code = "56F000 000000 5E7000 000000 0AF080 000000"
+    code_words = code.split()
+    data = bytearray()
+    for i in range(0, len(code_words)):
+      data += int.to_bytes(int(code_words[i], 16), length=3, byteorder='little', signed=False)
 
-  # Write code to PMEM
-  code_words = code.split()
-  for i in range(0, len(code_words)):
-    data = int(code_words[i], 16)
-    apu.write_u32(NV_PAPU_EPPMEM + i*4, data)
+  code = open("tiny-gp.inc").read()
+  print(code)
+  data = dsp.assemble(code)
+
+  # Convert the 24 bit words to 32 bit words
+  data = dsp.from24(data)
+
+  # Write code to PMEM (normally you can just use write() but we don't support that for apu MMIO yet.. boo!)
+  for i in range(0, len(data) // 4):
+    word = int.from_bytes(data[i*4:i*4+4], byteorder='little', signed=False) & 0xFFFFFF
+    apu.write_u32(NV_PAPU_EPPMEM + i*4, word)
     # According to XQEMU, 0x800 * 4 bytes will be loaded from scratch to PMEM at startup.
     # So just to be sure, let's also write this to the scratch..
-    write_u32(page_base + i*4, data)
+    write_u32(page_base + i*4, word)
 
   # Set XMEM
   apu.write_u32(NV_PAPU_EPXMEM + 0*4, 0x001337)
@@ -71,6 +86,8 @@ def dsp_homebrew():
 
   # Write X again. Bootcode in the DSP seems to overwrites XMEM + YMEM
   apu.write_u32(NV_PAPU_EPXMEM + 0*4, 0x001337)
+
+  time.sleep(0.1)
 
   # Read destination data from YMEM
   print("Read back X[0]:0x" + format(apu.read_u32(NV_PAPU_EPXMEM + 0*4), '06X'))

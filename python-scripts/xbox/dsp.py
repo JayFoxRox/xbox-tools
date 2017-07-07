@@ -49,7 +49,11 @@ def assemble(code):
   from_a56.close()
 
   #FIXME: Pipe to variable instead
-  a56_command = ["/home/fox/Data/Downloads/dspfoo/a56", "-o", from_a56.name, to_a56.name]
+  try:
+    a56_path = os.environ['A56']
+  except:
+    a56_path = None
+  a56_command = [a56_path, "-o", from_a56.name, to_a56.name]
 
   # Run a56 and remove input file when done
   a56_state = subprocess.run(a56_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
