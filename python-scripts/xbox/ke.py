@@ -1,4 +1,4 @@
-from . import interface
+from .interface import api
 from . import pe
 import struct
 
@@ -10,5 +10,5 @@ def MmGetPhysicalAddress(BaseAddress):
 
 def call_stdcall(function, types, *arguments):
   address = pe.resolve_export(function)
-  registers = interface.call(address, struct.pack(types, *arguments))
+  registers = api.call(address, struct.pack(types, *arguments))
   return registers['eax']
