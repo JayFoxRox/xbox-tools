@@ -27,6 +27,12 @@ def read(address, size, physical):
   return res.data
 
 def write(address, data, physical):
+  # nxdk-rdt is very buggy.. it needs all data in one network packet
+  # in order to make this work, we split large writes into chunks
+  N = 256
+  if len(data) > N:
+    write(address, data[0:N], physical) # Do write
+    return write(address + N, data[N:], physical) # Process rest of dats
   if physical:
     adddress |= 0x80000000
   req = Request()
