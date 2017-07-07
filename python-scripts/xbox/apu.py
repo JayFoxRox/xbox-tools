@@ -287,17 +287,20 @@ def RetrievePointer(register):
 def ReadSSL(offset, length):
   pass
 
-def ReadSGE(offset, length):
-  vpsgeaddr = RetrievePointer(NV_PAPU_VPSGEADDR)
+def _MapSGE(vpsgeaddr, offset):
   def vp_sge(sge_handle):
     return memory.read_u32(vpsgeaddr + sge_handle * 8, True)
+  page_index = offset // 0x1000
+  offset_in_page = offset % 0x1000
+  page_base = vp_sge(page_index)
+  return page_base + offset_in_page
+
+def ReadSGE(offset, length):
+  vpsgeaddr = RetrievePointer(NV_PAPU_VPSGEADDR)
   out = bytearray()
   while length > 0:
-    page_index = offset // 0x1000
-    offset_in_page = offset % 0x1000
-    page_base = vp_sge(page_index)
-    paged = page_base + offset_in_page
-    in_page = 0x1000 - offset_in_page
+    paged = _MapSGE(vpsgeaddr, offset)
+    in_page = 0x1000 - (paged % 0x1000)
     chunk_size = min(in_page, length)
     # FIXME: Somehow handle this permission stuff differently
     mapped = map_page(0x80000000 | paged, True)  
@@ -308,13 +311,32 @@ def ReadSGE(offset, length):
     offset += chunk_size
   return bytes(out)
 
+def WriteSGE(offset, data):
+  vpsgeaddr = RetrievePointer(NV_PAPU_VPSGEADDR)
+  while True:
+    remaining = len(data) - offset
+    if remaining == 0:
+      break
+    paged = _MapSGE(vpsgeaddr, offset)
+    in_page = 0x1000 - (paged % 0x1000)
+    chunk_size = min(in_page, remaining)
+    # FIXME: Somehow handle this permission stuff differently
+    mapped = map_page(0x80000000 | paged, True)  
+    memory.write(paged, data[-remaining:-remaining + chunk_size], True)
+    map_page(0x80000000 | paged, mapped)
+    offset += chunk_size
+  return
+
 def ReadVoice(voice_handle, field_offset, field_mask):
   vpvaddr = RetrievePointer(NV_PAPU_VPVADDR) #FIXME: Pass as string so we can look it up in a cache more easily 'NV_PAPU_VPVADDR'
   value = memory.read_u32(vpvaddr + voice_handle * NV_PAVS_SIZE + field_offset, True); # FIXME: Physical address
   return GetMasked(value, field_mask)
 
-def WriteVoice(voice_handle):
-  assert(False) # FIXME
+def WriteVoice(voice_handle, field_offset, field_mask, value):
+  vpvaddr = RetrievePointer(NV_PAPU_VPVADDR) #FIXME: Pass as string so we can look it up in a cache more easily 'NV_PAPU_VPVADDR'
+  old_value = memory.read_u32(vpvaddr + voice_handle * NV_PAVS_SIZE + field_offset, True); # FIXME: Physical address
+  new_value = SetMasked(old_value, field_mask, value)
+  memory.write_u32(vpvaddr + voice_handle * NV_PAVS_SIZE + field_offset, new_value, True); # FIXME: Physical address
 
 # This dumps information about the active voice, usually not of interest
 if False:
@@ -326,9 +348,7 @@ if False:
 
 # p = 4096*log2(f/48000)
 def PitchToFrequency(pitch):
-  # Get proper sign
-  signed_pitch = int.from_bytes(int.to_bytes(pitch, signed=False, byteorder='little', length=2), byteorder='little', signed=True)
-  return 2 ** (signed_pitch / 4096) * 48000
+  return 2 ** (pitch / 4096) * 48000
 
 # f = 2^(p/4096)*48000
 def FrequencyToPitch(frequency):
