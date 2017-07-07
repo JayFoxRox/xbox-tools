@@ -13,7 +13,7 @@ def Field(offset_name, mask_name=None):
     mask_name = offset_name + '_' + mask_name
     mask_value = globals().get(mask_name)
     if mask_value == None:
-      raise NameError
+      raise NameError(mask_name)
     mask_value = GetMask(mask_value)
   return(offset_value, mask_value)
 
@@ -142,9 +142,35 @@ def ListVoices(voice, name):
   print("TAR_VOL" + tar_vols)
 
   pitch = ReadVoiceField(voice, 'TAR_PITCH_LINK', 'PITCH')
-
+  # Make sure our pitch is signed
+  pitch = int.from_bytes(int.to_bytes(pitch, signed=False, byteorder='little', length=2), signed=True, byteorder='little')
   freq = apu.PitchToFrequency(pitch)
   print("Frequency: " + str(freq) + " Hz")
+
+  # Envelopes
+
+  def DumpEnvelope(prefix1, prefix2, reg):
+    ReadVoiceField(voice, prefix1, reg + '_DELAYTIME')
+    ReadVoiceField(voice, prefix1, reg + '_ATTACKRATE')
+    ReadVoiceField(voice, prefix2, reg + '_HOLDTIME')
+    ReadVoiceField(voice, prefix2, reg + '_DECAYRATE')
+    ReadVoiceField(voice, prefix2, reg + '_SUSTAINLEVEL')
+
+  # Envelope for volume
+  print("Volume Envelope:")
+  DumpEnvelope('CFG_ENV0', 'CFG_ENVA', 'EA')
+  ReadVoiceField(voice, 'TAR_LFO_ENV', 'EA_RELEASERATE')
+  ReadVoiceField(voice, 'PAR_STATE','EACUR')  
+  ReadVoiceField(voice, 'CUR_ECNT','EACOUNT')
+
+  # Envelope for pitch
+  print("Pitch / Cutoff Envelope:")
+  DumpEnvelope('CFG_ENV1', 'CFG_ENVF', 'EF')
+  ReadVoiceField(voice, 'CFG_MISC', 'EF_RELEASERATE')
+  ReadVoiceField(voice, 'PAR_STATE','EFCUR')
+  ReadVoiceField(voice, 'CUR_ECNT','EFCOUNT')
+  ReadVoiceField(voice, 'CFG_ENV0', 'EF_PITCHSCALE')
+  ReadVoiceField(voice, 'CFG_ENV1', 'EF_FCSCALE')
 
   if is_stream:
 
@@ -179,8 +205,11 @@ def ListVoices(voice, name):
       wav.writeframes(data)
 
       wav.close()
-    print("Dumping buffer")
-    DumpVoiceBuffer("vp-buffer-" + format(psl_start_ba, '08X') + ".wav")
+
+    #FIXME: Make this an option
+    if True:
+      print("Dumping buffer")
+      DumpVoiceBuffer("vp-buffer-" + format(psl_start_ba, '08X') + ".wav")
 
   next_voice = ReadVoiceField(voice, 'TAR_PITCH_LINK', 'NEXT_VOICE_HANDLE')
   return next_voice
