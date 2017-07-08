@@ -29,7 +29,7 @@ def xbdm_read_line():
 def xbdm_parse_response2(length=None):
   try:
     res = xbdm_read_line()
-    if res[3] != 45: #b'-': #FIXME: I suck at python.. how to compare a single letter to a byte string element?
+    if res[3] != 45: #b'-': #FIXME: how to compare a single letter to a byte string element?
       raise
     status = int(res[0:3])
   except:
@@ -52,8 +52,8 @@ def xbdm_parse_response2(length=None):
     lines = []
     while True:
       line = xbdm_read_line()
-      if line == b'.':
-        return lines
+      if line == b'.': #end of response
+        break
       lines += [line]
     return (status, lines)
   print("Unknown status: " + str(status))
@@ -65,7 +65,6 @@ def xbdm_parse_response2(length=None):
 #FIXME: For legacy reasons, should be updated?
 def xbdm_parse_response(length=None):
   return xbdm_parse_response2(length)[1]
-  
 
 def xbdm_command(cmd, length=None):
   #FIXME: If type is already in bytes we just send it binary!
@@ -77,28 +76,31 @@ def xbdm_command(cmd, length=None):
   return lines
 
 def GetModules():
-  return [] # FIXME: Make this work..
+  modulesList = []
   lines = xbdm_command("modules")
-  for line in lines:
-    print(line)
-    chunks = line.split()
-    for chunk in chunks:
-      if (chunk[0:6] == b'name=\"'):
-        print("  name = '" + str(chunk[6:-1]) + "'")
-      elif (chunk[0:5] == b'base='):
-        print("  base = '" + str(chunk[5]) + "'")
-      else:
-        print('  unparsed: ' + str(chunk))
-        pass
-        #assert(False)
-  return []
-#202- multiline response follows
-#name="xboxkrnl.exe" base=0x80010000 size=0x001380e0 check=0x0013eb88 timestamp=0x3cfcc86a
-#name="xbdm.dll" base=0xb0011000 size=0x000620c0 check=0x0007007d timestamp=0x407c6068
-#name="vx.dxt" base=0xb00b3000 size=0x00018d80 check=0x00024302 timestamp=0x407c620b
-#name="wavebank.exe" base=0x00010c40 size=0x0004fa40 check=0x00000000 timestamp=0x4c14abd2 tls xbe
-#.
 
+  for line in lines:
+
+    module ={}
+    line = line.decode("utf-8")
+
+    nameAddrChunks = line.split()
+
+    for nameAddrChunk in nameAddrChunks:
+       singleChunk = nameAddrChunk.split("=")    #name="xbdm.dll" -> ['name', '"xbdm.dll"']
+
+       if(len(singleChunk)==1):
+         value = True
+
+       elif((singleChunk[1][0] == '"') and (singleChunk[1][-1] == '"')): #contains a '"string"'
+         value = singleChunk[1].strip("\"")     #name of the module (without '"')
+
+       else:
+         value = int(singleChunk[1], 0)
+       module[singleChunk[0]] = value
+    modulesList.append(module)
+
+  return modulesList
 
 def GetMem(addr, length):
   if False:
@@ -190,11 +192,10 @@ if True:
 
   from xbox.pe import *
 
-  modules = GetModules()
-  # FIXME: Get location of xbdm.dll
-  xbdm_base = 0x0B0011000
-  DmResumeThread_addr = resolve_export(35, image_base=xbdm_base) #FIXME: Use location of xbdm.dll
-  #DmResumeThread_addr = resolve_export(35) #FIXME: Use location of xbdm.dll
+  modules=GetModules()
+  xbdm_module = [module for module in modules if module['name'] == "xbdm.dll"][0]
+  xbdm_base = xbdm_module['base']
+  DmResumeThread_addr = resolve_export(35, image_base=xbdm_base)
 
   hack = "0F20C05025FFFFFEFF0F22C08B5424088B1A8B4A048B4208E2028A03E203668B03E2028B03E2028803E203668903E2028903894208580F22C0B80000DB02C20400"
   xbdm_command("setmem addr=0x" + format(DmResumeThread_addr, 'X') + " data=" + hack)
