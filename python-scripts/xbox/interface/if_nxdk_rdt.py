@@ -17,6 +17,12 @@ def _send_simple_request(req, buffer_size=256):
   return res
 
 def read(address, size, physical):
+  # nxdk-rdt is very buggy.. it needs all data in one network packet
+  # in order to make this work, we split large reads into chunks
+  N = 256
+  if size > N:
+    chunk = read(address, N, physical) # Do read
+    return chunk + read(address + N, size - N, physical) # Process rest of data
   if physical:
     adddress |= 0x80000000
   req = Request()
@@ -32,7 +38,7 @@ def write(address, data, physical):
   N = 256
   if len(data) > N:
     write(address, data[0:N], physical) # Do write
-    return write(address + N, data[N:], physical) # Process rest of dats
+    return write(address + N, data[N:], physical) # Process rest of data
   if physical:
     adddress |= 0x80000000
   req = Request()
