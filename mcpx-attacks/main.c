@@ -91,11 +91,11 @@ static void tea_attack(uint8_t* flash, size_t flash_size, uint32_t target) {
   uint32_t hacked = 0x07FD588;
 
   // Also patch the xcodes to write a jump target to RAM
-	for (unsigned int i = 0; i < 0x1000; i++) {
+  for (unsigned int i = 0; i < 0x1000; i++) {
     uint32_t address = 0x80 + i * 9;
 
     // Check if this is an EXIT instruction
-		if (flash[address] == 0xEE) {
+    if (flash[address] == 0xEE) {
 
       // Keep a copy of the EXIT
       uint8_t tmp[9];
@@ -119,7 +119,7 @@ static void tea_attack(uint8_t* flash, size_t flash_size, uint32_t target) {
       memcpy(&flash[address], tmp, 9);
 
     }
-	}
+  }
 
 }
 
