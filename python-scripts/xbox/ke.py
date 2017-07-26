@@ -14,6 +14,13 @@ NULL = 0
 FALSE = 0x00000000
 TRUE  = 0x00000001 # FIXME: Check if these are correct!
 
+def AvSendTVEncoderOption(RegisterBase, Option, Param, Result):
+  #IN PVOID RegisterBase,
+  #IN ULONG Option,
+  #IN ULONG Param,
+  #OUT PULONG Result
+  call_stdcall(2, "<IIII", RegisterBase, Option, Param, Result)
+
 def IoDeviceObjectType():
   return pe.resolve_export(70)
 
