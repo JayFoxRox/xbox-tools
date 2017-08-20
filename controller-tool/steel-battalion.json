@@ -1,0 +1,386 @@
+{
+
+  "vid": "0A7B",
+  "pid": "D000",
+
+  "in": {
+    "RightJoyMainWeapon": {
+      "offset": 2,
+      "mask": "01"
+    },
+    "RightJoyFire": {
+      "offset": 2,
+      "mask": "03",
+      "notes": "FIXME: WTF?! Mask might be bad?"
+    },
+    "RightJoyLockOn": {
+      "offset": 2,
+      "mask": "04"
+    },
+    "Eject": {
+      "offset": 2,
+      "mask": "08"
+    },
+    "CockpitHatch": {
+      "offset": 2,
+      "mask": "10"
+    },
+    "Ignition": {
+      "offset": 2,
+      "mask": "20"
+    },
+    "Start": {
+      "offset": 2,
+      "mask": "40"
+    },
+    "MultiMonOpenClose": {
+      "offset": 2,
+      "mask": "80"
+    },
+    "MultiMonMapZoomInOut": {
+      "offset": 3,
+      "mask": "01"
+    },
+    "MultiMonModeSelect": {
+      "offset": 3,
+      "mask": "02"
+    },
+    "MultiMonSubMonitor": {
+      "offset": 3,
+      "mask": "04"
+    },
+    "MainMonZoomIn": {
+      "offset": 3,
+      "mask": "08"
+    },
+    "MainMonZoomOut": {
+      "offset": 3,
+      "mask": "10"
+    },
+    "FunctionFSS": {
+      "offset": 3,
+      "mask": "20"
+    },
+    "FunctionManipulator": {
+      "offset": 3,
+      "mask": "40"
+    },
+    "FunctionLineColorChange": {
+      "offset": 3,
+      "mask": "80"
+    },
+    "Washing": {
+      "offset": 4,
+      "mask": "01"
+    },
+    "Extinguisher": {
+      "offset": 4,
+      "mask": "02"
+    },
+    "Chaff": {
+      "offset": 4,
+      "mask": "04"
+    },
+    "FunctionTankDetach": {
+      "offset": 4,
+      "mask": "08"
+    },
+    "FunctionOverride": {
+      "offset": 4,
+      "mask": "10"
+    },
+    "FunctionNightScope": {
+      "offset": 4,
+      "mask": "20"
+    },
+    "FunctionF1": {
+      "offset": 4,
+      "mask": "40"
+    },
+    "FunctionF2": {
+      "offset": 4,
+      "mask": "80"
+    },
+    "FunctionF3": {
+      "offset": 5,
+      "mask": "01"
+    },
+    "WeaponConMain": {
+      "offset": 5,
+      "mask": "02"
+    },
+    "WeaponConSub": {
+      "offset": 5,
+      "mask": "04"
+    },
+    "WeaponConMagazine": {
+      "offset": 5,
+      "mask": "08"
+    },
+    "Comm1": {
+      "offset": 5,
+      "mask": "10"
+    },
+    "Comm2": {
+      "offset": 5,
+      "mask": "20"
+    },
+    "Comm3": {
+      "offset": 5,
+      "mask": "40"
+    },
+    "Comm4": {
+      "offset": 5,
+      "mask": "80"
+    },
+    "Comm5": {
+      "offset": 6,
+      "mask": "01"
+    },
+    "LeftJoySightChange": {
+      "offset": 6,
+      "mask": "02"
+    },
+    "ToggleFilterControl": {
+      "offset": 6,
+      "mask": "04"
+    },
+    "ToggleOxygenSupply": {
+      "offset": 6,
+      "mask": "08"
+    },
+    "ToggleFuelFlowRate": {
+      "offset": 6,
+      "mask": "10"
+    },
+    "ToggleBuffreMaterial": {
+      "offset": 6,
+      "mask": "20"
+    },
+    "ToggleVTLocation": {
+      "offset": 6,
+      "mask": "40"
+    },
+    "unk6": {
+      "offset": 6,
+      "mask": "80"
+    },
+    "unk7": {
+      "offset": 7,
+      "mask": "FF"
+    },    
+    "unk8": {
+      "offset": 8,
+      "mask": "FF"
+    },
+    "AimingX": {
+      "offset": 9,
+      "mask": "FF",
+      "notes": "maybe 0xFFFF at offset 8? 'Aiming Lever' joystick on the right. X Axis value."
+    },
+    "AimingY": {
+      "offset": 11,
+      "mask": "FF",
+      "notes": "maybe 0xFFFF at offset 10? 'Aiming Lever' joystick on the right. Y Axis value."
+    },
+    "RotationLever": {
+      "offset": 13,
+      "mask": "FF",
+      "notes": "maybe 0xFFFF at offset 12? 'Rotation Lever' joystick on the left."
+    },
+    "SightChangeX": {
+      "offset": 15,
+      "mask": "FF",
+      "notes": "maybe 0xFFFF at offset 14? 'Sight Change' analog stick on the 'Rotation Lever' joystick. X Axis value."
+    },
+    "SightChangeY": {
+      "offset": 17,
+      "mask": "FF",
+      "notes": "maybe 0xFFFF at offset 16? 'Sight Change' analog stick on the 'Rotation Lever' joystick. Y Axis value."
+    },
+    "LeftPedal": {
+      "offset": 19,
+      "mask": "FF",
+      "notes": "maybe 0xFFFF at offset 18?"
+    },
+    "MiddlePedal": {
+      "offset": 21,
+      "mask": "FF",
+      "notes": "maybe 0xFFFF at offset 20?"
+    },
+    "RightPedal": {
+      "offset": 23,
+      "mask": "FF",
+      "notes": "maybe 0xFFFF at offset 22?"
+    },
+    "TunerDial": {
+      "offset": 24,
+      "mask": "0F",
+      "notes": "The 9 o'clock postion is 0, and the 6 o'clock position is 12. The blank area between the 6 and 9 o'clock positions is 13, 14, and 15 clockwise."
+    },
+    "unk24": {
+      "offset": 24,
+      "mask": "F0"
+    },
+    "GearLever": {
+      "offset": 25,
+      "mask": "FF",
+      "notes": "The gear lever on the left block."
+    }
+  },
+
+  "out": {
+    "EmergencyEject": {
+      "offset": 2,
+      "mask": "0F"
+    },
+    "CockpitHatch": {
+      "offset": 2,
+      "mask": "F0"
+    },
+    "Ignition": {
+      "offset": 3,
+      "mask": "0F"
+    },
+    "Start": {
+      "offset": 3,
+      "mask": "F0"
+    },
+    "OpenClose": {
+      "offset": 4,
+      "mask": "0F"
+    },
+    "MapZoomInOut": {
+      "offset": 4,
+      "mask": "F0"
+    },
+    "ModeSelect": {
+      "offset": 5,
+      "mask": "0F"
+    },
+    "SubMonitorModeSelect": {
+      "offset": 5,
+      "mask": "F0"
+    },
+    "MainMonitorZoomIn": {
+      "offset": 6,
+      "mask": "0F"
+    },
+    "MainMonitorZoomOut": {
+      "offset": 6,
+      "mask": "F0"
+    },
+    "ForecastShootingSystem": {
+      "offset": 7,
+      "mask": "0F"
+    },
+    "Manipulator": {
+      "offset": 7,
+      "mask": "F0"
+    },
+    "LineColorChange": {
+      "offset": 8,
+      "mask": "0F"
+    },
+    "Washing": {
+      "offset": 8,
+      "mask": "F0"
+    },
+    "Extinguisher": {
+      "offset": 9,
+      "mask": "0F"
+    },
+    "Chaff": {
+      "offset": 9,
+      "mask": "F0"
+    },
+    "TankDetach": {
+      "offset": 10,
+      "mask": "0F"
+    },
+    "Override": {
+      "offset": 10,
+      "mask": "F0"
+    },
+    "NightScope": {
+      "offset": 11,
+      "mask": "0F"
+    },
+    "F1": {
+      "offset": 11,
+      "mask": "F0"
+    },
+    "F2": {
+      "offset": 12,
+      "mask": "0F"
+    },
+    "F3": {
+      "offset": 12,
+      "mask": "F0"
+    },
+    "MainWeaponControl": {
+      "offset": 13,
+      "mask": "0F"
+    },
+    "SubWeaponControl": {
+      "offset": 13,
+      "mask": "F0"
+    },
+    "MagazineChange": {
+      "offset": 14,
+      "mask": "0F"
+    },
+    "Comm1": {
+      "offset": 14,
+      "mask": "F0"
+    },
+    "Comm2": {
+      "offset": 15,
+      "mask": "0F"
+    },
+    "Comm3": {
+      "offset": 15,
+      "mask": "F0"
+    },
+    "Comm4": {
+      "offset": 16,
+      "mask": "0F"
+    },
+    "Comm5": {
+      "offset": 16,
+      "mask": "F0"
+    },
+    "unk17": {
+      "offset": 17,
+      "mask": "0F"
+    },
+    "GearR": {
+      "offset": 17,
+      "mask": "F0"
+    },
+    "GearN": {
+      "offset": 18,
+      "mask": "0F"
+    },
+    "Gear1": {
+      "offset": 18,
+      "mask": "F0"
+    },
+    "Gear2": {
+      "offset": 19,
+      "mask": "0F"
+    },
+    "Gear3": {
+      "offset": 19,
+      "mask": "F0"
+    },
+    "Gear4": {
+      "offset": 20,
+      "mask": "0F"
+    },
+    "Gear5": {
+      "offset": 20,
+      "mask": "F0"
+    }
+  }
+}
