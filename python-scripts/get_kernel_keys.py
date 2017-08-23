@@ -40,7 +40,7 @@ if options.dump:
 
   print ('HDD Key:\t{}'.format(''.join(format(n, '02x') for n in hddKey)))
   hddKeyFile = open('hdd_key.bin', 'wb')
-  print ('Dumping EEPROM key to hdd_key.bin...\n')
+  print ('Dumping HDD key to hdd_key.bin...\n')
   hddKeyFile.write(hddKey)
 
 else:
