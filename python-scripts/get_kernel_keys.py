@@ -35,36 +35,35 @@ parser.add_option('-a', action='store_true', dest='all',
                   help='view all keys found in kernel memory space')
 (options, args) = parser.parse_args()
 
-eepKey = bytes(read(ke.XboxEEPROMKey(), 20, False))
+eepKey = bytes(read(ke.XboxEEPROMKey(), 16, False))
 hddKey = bytes(read(ke.XboxHDKey(), 16, False))
 sigKey = bytes(read(ke.XboxSignatureKey(), 16, False))
 lanKey = bytes(read(ke.XboxLANKey(), 16, False))
 
 if int.from_bytes(eepKey, 'big', signed=False) == 0:
-  print ("\nWARNING: Your EEPROM Key has been erased! Is your xbox running a retail BIOS?")
-  print ('For more information please go to http://xboxdevwiki.net/Kernel/XboxEEPROMKey\n')
+  print ("\n\033[1mWARNING: Your EEPROM Key has been erased! Is your xbox running a retail BIOS?")
+  print ('For more information please go to http://xboxdevwiki.net/Kernel/XboxEEPROMKey\033[0m')
   eepKeyErased = True
 else:
-  print ('')
   eepKeyErased = False
 
 if options.dump:
   if eepKeyErased:
-    print ('EEPROM Key:\t{}'.format(''.join(format(n, '02x') for n in eepKey)))
-    print ('Your EEPROM key has been erased, not dumping...\n')
+    print ('\n\033[1mYour EEPROM key has been erased, not dumping...\033[0m')
+    print ('EEPROM Key:\t{}\n'.format(''.join(format(n, '02x') for n in eepKey)))
   else:
     print ('EEPROM Key:\t{}'.format(''.join(format(n, '02x') for n in eepKey)))
     eepKeyFile = open('eeprom_key.bin', 'wb')
     print ('Dumping EEPROM key to eeprom_key.bin...\n')
     eepKeyFile.write(eepKey)
 
-  print ('HDD Key:\t{}'.format(''.join(format(n, '02x') for n in hddKey)))
-  hddKeyFile = open('hdd_key.bin', 'wb')
-  print ('Dumping HDD key to hdd_key.bin...\n')
+  print ('\033[1mDumping HDD key to hdd_key.bin...\033[0m')
+  print ('HDD Key:\t{}\n'.format(''.join(format(n, '02x') for n in hddKey)))
+  hddKeyFile = open('hdd_key.bin', 'wb')  
   hddKeyFile.write(hddKey)
 
 else:
-  print ('EEPROM Key:\t{}'.format(''.join(format(n, '02x') for n in eepKey)))
+  print ('\nEEPROM Key:\t{}'.format(''.join(format(n, '02x') for n in eepKey)))
   print ('HDD Key:\t{}'.format(''.join(format(n, '02x') for n in hddKey)))
 
 if options.all:
