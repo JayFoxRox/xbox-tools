@@ -48,17 +48,17 @@ altSigKeysDump = bytearray(read(ke.XboxAlternateSignatureKeys(), 256, False))
 pubKeyDataDump = read(ke.XePublicKeyData(), 284, False)
 
 if args.exec or args.other or args.sec:
-  print ("\n\033[1mWARNING: These keys are specific to your Xbox, please keep them safe!")
-  print ("Making them publicly available would likely be a bad idea...\033[0m")
+  print ("\nWARNING: These keys are specific to your Xbox, please keep them safe!")
+  print ("Making them publicly available would likely be a bad idea...")
 
 
 if args.exec:
-  print ("\n\033[1mExecutable Keys\033[0m")
+  print ("\nEXECUTABLE KEYS")
   print ('Signature Key:\t\t\t{}'.format(''.join(format(n, '02x') for n in sigKey)))
   print ('LAN Key:\t\t\t{}'.format(''.join(format(n, '02x') for n in lanKey)))
 
 if args.other:
-  print ("\n\033[1mOther Keys\033[0m")
+  print ("\nOTHER KEYS")
   
   altSigKeys = []
   
@@ -84,13 +84,13 @@ if args.other:
 
 if args.sec:
   if int.from_bytes(eepKey, 'big', signed=False) == 0:
-    print ("\n\033[1mWARNING: Your EEPROM Key has been erased! Is your Xbox running a retail BIOS?")
-    print ('For more information please go to http://xboxdevwiki.net/Kernel/XboxEEPROMKey\033[0m')
+    print ("\nWARNING: Your EEPROM Key has been erased! Is your Xbox running a retail BIOS?")
+    print ('For more information please go to http://xboxdevwiki.net/Kernel/XboxEEPROMKey')
     eepKeyErased = True
   else:
     eepKeyErased = False
   
-  print ("\n\033[1mSecurity Keys\033[0m")
+  print ("\nSECURITY KEYS")
   print ('EEPROM Key:\t\t\t{}'.format(''.join(format(n, '02x') for n in eepKey)))
   print ('HDD Key:\t\t\t{}'.format(''.join(format(n, '02x') for n in hddKey)))
 

@@ -27,51 +27,49 @@
 
 from hashlib import sha1
 import hmac
-import optparse
+import argparse
 
 class Eeprom:
-  def __init__(self, eepFileLoc):
-    eepFile = open(eepFileLoc, 'rb')
-
+  def __init__(self, eepDump):
     # boot variables
-    self.hash = bytes(eepFile.read(20))           # EEPROM hash
-    self.confounder = bytes(eepFile.read(8))      # encrypted confounder
-    self.hddKey = bytes(eepFile.read(16))         # encrypted HDD key
-    self.gameReg = bytes(eepFile.read(4))         # encrypted game region code
+    self.hash = eepDump[0:20]           # EEPROM hash
+    self.confounder = eepDump[20:28]      # encrypted confounder
+    self.hddKey = eepDump[28:44]         # encrypted HDD key
+    self.gameReg = eepDump[44:48]         # encrypted game region code
 
     # identity variables
-    self.identChk = bytes(eepFile.read(4))        # identity checksum
-    self.serial = bytes(eepFile.read(12))         # serial number
-    self.mac = bytes(eepFile.read(6))             # MAC address
-    self.unknown0 = bytes(eepFile.read(2))        # TBD
-    self.onlineKey = bytes(eepFile.read(16))      # online key
-    self.videoStd = bytes(eepFile.read(4))        # NTSC / PAL
-    self.unknown1 = bytes(eepFile.read(4))        # TBD
+    self.identChk = eepDump[48:52]        # identity checksum
+    self.serial = eepDump[52:64]         # serial number
+    self.mac = eepDump[64:70]             # MAC address
+    self.unknown0 = eepDump[70:72]        # TBD
+    self.onlineKey = eepDump[72:88]      # online key
+    self.videoStd = eepDump[88:92]        # NTSC / PAL
+    self.unknown1 = eepDump[92:96]        # TBD
 
     # settings variables
-    self.settChk = bytes(eepFile.read(4))         # settings checksum
-    self.timeZoneBias = bytes(eepFile.read(4))    # time zone bias
-    self.timeZoneStdName = bytes(eepFile.read(4)) # standard timezone
-    self.timeZoneDltName = bytes(eepFile.read(4)) # daylight savings timezone
-    self.unknown2 = bytes(eepFile.read(8))        # TBD
-    self.timeZoneStdDate = bytes(eepFile.read(4)) # standard date / time
-    self.timeZoneDltDate = bytes(eepFile.read(4)) # daylight savings date / time
-    self.unknown3 = bytes(eepFile.read(8))        # TBD
-    self.timeZoneStdBias = bytes(eepFile.read(4)) # standard bias
-    self.timeZoneDltBias = bytes(eepFile.read(4)) # daylight savings bias
-    self.languageId = bytes(eepFile.read(4))      # language identifier
-    self.videoFlags = bytes(eepFile.read(4))      # video settings
-    self.audioFlags = bytes(eepFile.read(4))      # audio settings
-    self.gameParCont = bytes(eepFile.read(4))     # game parental contol settings
-    self.parContPass = bytes(eepFile.read(4))     # parental control password
-    self.dvdParCont = bytes(eepFile.read(4))      # DVD parental control settings
-    self.ip = bytes(eepFile.read(4))              # IP address
-    self.dns = bytes(eepFile.read(4))             # DNS server
-    self.gateway = bytes(eepFile.read(4))         # default gateway
-    self.subnet = bytes(eepFile.read(4))          # subnet
-    self.unknown4 = bytes(eepFile.read(4))        # TBD
-    self.dvdReg = bytes(eepFile.read(4))          # DVD region code
-    self.unknown5 = bytes(eepFile.read(64))       # TBD
+    self.settChk = eepDump[96:100]         # settings checksum
+    self.timeZoneBias = eepDump[100:104]   # time zone bias
+    self.timeZoneStdName = eepDump[104:108] # standard timezone
+    self.timeZoneDltName = eepDump[108:112] # daylight savings timezone
+    self.unknown2 = eepDump[112:120]        # TBD
+    self.timeZoneStdDate = eepDump[120:124] # standard date / time
+    self.timeZoneDltDate = eepDump[124:128] # daylight savings date / time
+    self.unknown3 = eepDump[128:136]       # TBD
+    self.timeZoneStdBias = eepDump[136:140] # standard bias
+    self.timeZoneDltBias = eepDump[140:144] # daylight savings bias
+    self.languageId = eepDump[144:148]      # language identifier
+    self.videoFlags = eepDump[148:152]      # video settings
+    self.audioFlags = eepDump[152:156]      # audio settings
+    self.gameParCont = eepDump[156:160]     # game parental contol settings
+    self.parContPass = eepDump[160:164]     # parental control password
+    self.dvdParCont = eepDump[164:168]      # DVD parental control settings
+    self.ip = eepDump[168:172]              # IP address
+    self.dns = eepDump[172:176]             # DNS server
+    self.gateway = eepDump[176:180]         # default gateway
+    self.subnet = eepDump[180:184]          # subnet
+    self.unknown4 = eepDump[184:188]        # TBD
+    self.dvdReg = eepDump[188:192]          # DVD region code
+    self.unknown5 = eepDump[192:256]       # TBD
 
 # Because of the confounder we have to split the RC4 decryption / encryption proccess
 # into two functions (eepKeyPrepCrypt / eepKeyCrypt). We also need a way to share state
@@ -82,11 +80,16 @@ class Eeprom:
 # from the Eeprom method object (eeprom.hddKey + eeprom.gameReg). This is also why we
 # don't use any standard RC4 crypto libaries here.
 
+# This code was adapted from https://en.wikipedia.org/wiki/RC4
+
+# store RC4 key permuataion data here
 class EepKeyObj:
   state = bytearray(range(256))
   i = 0
   j = 0
 
+# RC4 Key-Scheduling Algorithm (KSA)
+# because of the confounder we only want to call this once
 def eepKeyPrepCrypt(eepKey, eepKeyObj):
   j = 0
 
@@ -94,6 +97,9 @@ def eepKeyPrepCrypt(eepKey, eepKeyObj):
     j = (j + eepKeyObj.state[i] + eepKey[i % len(eepKey)]) % 256
     eepKeyObj.state[i], eepKeyObj.state[j] = eepKeyObj.state[j], eepKeyObj.state[i]
 
+# RC4 Pseudo-Random Generation Algorithm (PRGA)
+# because of the confounder this has been slighly modified to keep
+# i / j stored in EepKeyObj rather than setting them to 0 per decryption
 def eepKeyCrypt(eepCryptData, eepKeyObj):
   eepData = bytearray()
   i = eepKeyObj.i
@@ -110,89 +116,85 @@ def eepKeyCrypt(eepCryptData, eepKeyObj):
   eepKeyObj.j = j
   return eepData
 
-parser = optparse.OptionParser()
-parser.add_option('-f', action='store', dest='eepFileLoc')
-parser.add_option('-k', action='store', dest='keyFileLoc')
-(options, args) = parser.parse_args()
+parser = argparse.ArgumentParser()
+parser.add_argument('-f', action='store', dest='eepFileLoc',
+                  help='location of your Xbox eeprom dump')
+parser.add_argument('-k', action='store', dest='keyFileLoc',
+                  help='location of your Xbox eeprom key dump')
+args = parser.parse_args()
 
-if options.eepFileLoc:
-  eeprom = Eeprom(options.eepFileLoc)
-  print ('\033[1mEncrypted EEPROM Data\033[0m')
+if args.eepFileLoc:
+  eepFile = open(args.eepFileLoc, 'rb')
+  eepDump = eepFile.read(256)
+  eepFile.close()
+  eeprom = Eeprom(eepDump)
+  print ('ENCRYPTED EEPROM DATA')
   print ('EEPROM Hash:\t\t\t{}'.format(''.join(format(x, '02x') for x in eeprom.hash)))
   print ('Encrypted Confounder:\t\t{}'.format(''.join(format(x, '02x') for x in eeprom.confounder)))
   print ('Encrypted HDD Key:\t\t{}'.format(''.join(format(x, '02x') for x in eeprom.hddKey)))
   print ('Encrypted Game Region Code:\t{}'.format(''.join(format(x, '02x') for x in eeprom.gameReg)))
 
-  print ('\n\033[1mIdentity EEPROM Data\033[0m')
+  print ('\nIDENTITY EEPROM DATA')
   print ('Identity Checksum:\t\t{}'.format(''.join(format(x, '02x') for x in eeprom.identChk)))
   print ('Serial Number:\t\t\t{}'.format(eeprom.serial.decode('ascii')))
   print ('MAC Address:\t\t\t{}'.format(''.join(format(x, '02x') for x in eeprom.mac)))
   print ('Online Key:\t\t\t{}'.format(''.join(format(x, '02x') for x in eeprom.onlineKey)))
 
   # print NTSC / PAL instead of their respective codes
-  if ''.join(format(x, '02x') for x in eeprom.videoStd) == '00014000':
-    print ('Video Standard:\t\t\tNTSC')  
-  elif ''.join(format(x, '02x') for x in eeprom.videoStd) == '00038000':
-    print ('Video Standard:\t\t\tPAL')
+  if int.from_bytes(eeprom.videoStd, 'big', signed=False) == 81920: # 81920 == 00014000 
+    print ('Video Standard:\t\t\tNTSC ({})'.format(''.join(format(x, '02x') for x in eeprom.videoStd)))  
+  elif int.from_bytes(eeprom.videoStd, 'big', signed=False) == 229376: # 229376 == 00038000
+    print ('Video Standard:\t\t\tPAL ({})'.format(''.join(format(x, '02x') for x in eeprom.videoStd)))
   else:
     print ('Video Standard:\t\t\t{}'.format(''.join(format(x, '02x') for x in eeprom.videoStd)))
 
-if options.eepFileLoc and options.keyFileLoc:
-  # load eeprom key
-  eepKeyFile = open(options.keyFileLoc, 'rb')
-  eepKey = eepKeyFile.read()
+  if args.keyFileLoc:
+    # load eeprom key
+    eepKeyFile = open(args.keyFileLoc, 'rb')
+    eepKey = eepKeyFile.read()
+    eepKeyFile.close()
   
-  # generate hmac-sha1 hash of eeprom key
-  eepKeyHash = hmac.new(eepKey, eeprom.hash, sha1).digest()
+    # generate hmac-sha1 hash of eeprom key
+    eepKeyHash = hmac.new(eepKey, eeprom.hash, sha1).digest()
 
-  # initialize EepKeyObj method object
-  eepKeyObj = EepKeyObj()
-  eepKeyPrepCrypt(eepKeyHash, eepKeyObj)
+    # initialize EepKeyObj method object
+    eepKeyObj = EepKeyObj()
+    eepKeyPrepCrypt(eepKeyHash, eepKeyObj)
   
-  # decrypt confounder 
-  decConf = eepKeyCrypt(eeprom.confounder, eepKeyObj)
-  
-  # assemble encrypted HDD key and game region code into a single bytearray
-  eepData = bytearray()
-  for byte in eeprom.hddKey:
-    eepData.append(byte)
-  for byte in eeprom.gameReg:
-    eepData.append(byte)
+    # decrypt confounder 
+    decConf = eepKeyCrypt(eepDump[20:28], eepKeyObj)
 
-  # decrypt HDD key and game region code
-  decData = eepKeyCrypt(eepData, eepKeyObj)
+    # decrypt HDD key and game region code
+    decData = eepKeyCrypt(eepDump[28:48], eepKeyObj)
 
-  # assemble decrypted EEPROM data into a single bytearray
-  hashData = bytearray()
-  for byte in decConf:
-    hashData.append(byte)
-  for byte in decData:
-    hashData.append(byte)
+    # we need to hash the confounder and data as one
+    hashData = decConf + decData
 
-  # hash decrypted EEPROM data
-  eepHash = hmac.new(eepKey, hashData, sha1).digest()
+    # hash decrypted EEPROM data
+    eepHash = hmac.new(eepKey, hashData, sha1).digest()
 
-  # make sure hashes match
-  if eepHash == eeprom.hash:
-    print ('\n\033[1mThe decrypted and encrypted EEPROM hashes match!\033[0m')
-    
-    # pull HDD key from assembled bytearray
-    decHddKey = bytearray()
-    for cnt in range(16):
-      decHddKey.append(decData[cnt])
+    # make sure hashes match
+    if eepHash == eeprom.hash:
+      print ('\nDECRYPTED EEPROM DATA')
 
-    # pull game region from assembled bytearray
-    decGameReg = bytearray()
-    for cnt in range(4):
-      decGameReg.append(decData[cnt + 16])
-      
-    print ('Decrypted Confounder:\t\t{}'.format(''.join(format(x, '02x') for x in decConf)))
-    print ('Decrypted HDD Key:\t\t{}'.format(''.join(format(x, '02x') for x in decHddKey)))
-    print ('Decrypted Game Region Code:\t{}'.format(''.join(format(x, '02x') for x in decGameReg)))
+      # pull HDD key from decryted data
+      decHddKey = bytearray()
+      for cnt in range(16):
+        decHddKey.append(decData[cnt])
 
-  # hashes don't match
-  else:
-    print ('\n\033[1mThe decrypted and encrypted EEPROM hashes do not match!')
-    print ('Either your EEPROM file or EEPROM key is corrupted / invalid!\033[0m')
-    print ('Encrypted EEPROM Hash:\t\t{}'.format(''.join(format(x, '02x') for x in eeprom.hash)))
-    print ('Decrypted EEPROM Hash:\t\t{}'.format(''.join(format(x, '02x') for x in eepHash)))
+      # pull game region from decrypted data
+      decGameReg = bytearray()
+      for cnt in range(4):
+        decGameReg.append(decData[cnt + 16])
+
+      print ('Verified EEPROM Hash:\t\t{}'.format(''.join(format(x, '02x') for x in eepHash)))      
+      print ('Decrypted Confounder:\t\t{}'.format(''.join(format(x, '02x') for x in decConf)))
+      print ('Decrypted HDD Key:\t\t{}'.format(''.join(format(x, '02x') for x in decHddKey)))
+      print ('Decrypted Game Region Code:\t{}'.format(''.join(format(x, '02x') for x in decGameReg)))
+
+    # hashes don't match
+    else:
+      print ('\nWARNING: The decrypted and encrypted EEPROM hashes do not match!')
+      print ('Either your EEPROM file or EEPROM key is corrupt / invalid!\n')
+      print ('Original EEPROM Hash:\t\t{}'.format(''.join(format(x, '02x') for x in eeprom.hash)))
+      print ('Invalid EEPROM Hash:\t\t{}'.format(''.join(format(x, '02x') for x in eepHash)))
