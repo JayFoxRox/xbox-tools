@@ -20,9 +20,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# Tool for decrypting, encrypting, and displaying data contained in the xbox EEPROM
+# Tool for decrypting, encrypting, and displaying data contained in the Xbox EEPROM
 #
-# For more information about the xbox EEPROM, see:
+# For more information about the Xbox EEPROM, see:
 # http://xboxdevwiki.net/EEPROM
 
 from hashlib import sha1
