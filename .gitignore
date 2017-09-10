@@ -15,3 +15,6 @@ build/
 Build/
 __pycache__/
 *.pyc
+*.xtf
+*.ttf
+*.svg
