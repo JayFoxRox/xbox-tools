@@ -35,6 +35,9 @@ def IoSynchronousDeviceIoControlRequest(IoControlCode, DeviceObject, InputBuffer
   #IN BOOLEAN InternalDeviceIoControl) # FIXME: How to handle this one properly? xxxB? Bxxx? I?
   return call_stdcall(84, "<IIIIIIII", IoControlCode, DeviceObject, InputBuffer, InputBufferLength, OutputBuffer, OutputBufferLength, ReturnedOutputBufferLength, InternalDeviceIoControl)
 
+def KeTickCount():
+  return pe.resolve_export(156)
+
 def MmAllocateContiguousMemory(NumberOfBytes):
   return call_stdcall(165, "<I", NumberOfBytes)
 
