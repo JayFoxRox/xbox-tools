@@ -5,6 +5,7 @@
 from xbox import *
 
 import time
+import struct
 
 NV_PRAMDAC = 0x680000
 NV_PRAMDAC_NVPLL_COEFF = 0x500
@@ -72,6 +73,29 @@ class KeTickCountTimer(Timer):
   def RetrieveTicks(self):
     return memory.read_u32(ke.KeTickCount())
 
+class RDTSCTimer(Timer):
+
+  def __init__(self):
+    super(RDTSCTimer, self).__init__("RDTSC")
+    code = bytes([
+      0x0F, 0x31,             # rdtsc
+      0x8B, 0x4C, 0x24, 0x04, # mov    ecx,DWORD PTR [esp+0x4]
+      0x89, 0x01,             # mov    DWORD PTR [ecx],eax
+      0x89, 0x51, 0x04,       # mov    DWORD PTR [ecx+0x4],edx
+      0xC2, 0x04, 0x00        # ret    0x4
+    ])
+    pointer = ke.MmAllocateContiguousMemory(len(code) + 8)
+    memory.write(pointer, code)
+    self.code = pointer
+    self.data = pointer + len(code)
+
+  def RetrieveFrequency(self):
+    return 2200000000.0 / 3.0 # 733.3 MHz
+
+  def RetrieveTicks(self):
+    api.call(self.code, struct.pack("<I", self.data))
+    return (memory.read_u32(self.data + 4) << 32) | memory.read_u32(self.data + 0)
+
 
 class GPUTimer(Timer):
 
@@ -107,6 +131,8 @@ class GPUTimer(Timer):
 if __name__ == "__main__":
 
   timers = []
+
+  timers.append(RDTSCTimer())
   timers.append(KeTickCountTimer())
   timers.append(GPUTimer())
 
