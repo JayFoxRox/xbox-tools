@@ -8,11 +8,21 @@ from xbox import *
 import time
 import signal
 import sys
+import struct
+import traceback
 from PIL import Image
 
+abortNow = False
+
 def signal_handler(signal, frame):
-        print('Got SIGINT! Exiting')
-        sys.exit(0)
+  global abortNow
+  if abortNow == False:
+    print('Got first SIGINT! Aborting..')
+    abortNow = True
+  else:
+    print('Got second SIGINT! Forcing exit')
+    sys.exit(0)
+
 signal.signal(signal.SIGINT, signal_handler)
 
 dma_state = 0xFD003228
@@ -26,6 +36,24 @@ get_addr = 0xFD003270
 get_state = 0xFD003250
 
 pgraph_state = 0xFD400720
+pgraph_status = 0xFD400700
+
+def disable_pgraph_fifo():
+  s1 = read_u32(pgraph_state)
+  write_u32(pgraph_state, s1 & 0xFFFFFFFE)
+
+def wait_until_pgraph_idle():
+  while(read_u32(pgraph_status) & 0x00000001):
+    pass
+
+def enable_pgraph_fifo():
+  s1 = read_u32(pgraph_state)
+  write_u32(pgraph_state, s1 | 0x00000001)
+  time.sleep(0.001) # FIXME: Loop until puller is stopped instead
+
+def wait_until_pusher_idle():
+  while(read_u32(get_state) & (1 << 4)):
+    pass
 
 def pause_fifo_puller():
   # Idle the puller and pusher
@@ -197,18 +225,17 @@ def step_fifo(steps):
 def dumpPB(start, end):
   offset = start
   while(offset != end):
-    
-    count = parseCommand(offset, True)
-    if count == 0:
+    offset = parseCommand(offset, True)
+    if offset == 0:
       break
-    offset += count
 
+#FIXME: This works poorly if the method count is not 0
 def dumpPBState():
   v_dma_get_addr = read_u32(dma_get_addr)
   v_dma_put_addr = read_u32(dma_put_addr)
   v_dma_subroutine = read_u32(dma_subroutine)
 
-  print("0x%08X / 0x%08X / 0x%08X" % (v_dma_get_addr, v_dma_put_addr, v_dma_subroutine))
+  print("PB-State: 0x%08X / 0x%08X / 0x%08X" % (v_dma_get_addr, v_dma_put_addr, v_dma_subroutine))
   dumpPB(v_dma_get_addr, v_dma_put_addr)
   print()
 
@@ -219,7 +246,7 @@ def dumpCacheState():
   v_get_state = read_u32(get_state)
   v_put_state = read_u32(put_state)
 
-  print("0x%X / 0x%X" % (v_get_addr, v_put_addr))
+  print("CACHE-State: 0x%X / 0x%X" % (v_get_addr, v_put_addr))
 
   print("Put / Pusher enabled: %s" % ("Yes" if (v_put_state & 1) else "No"))
   print("Get / Puller enabled: %s" % ("Yes" if (v_get_state & 1) else "No"))
@@ -256,20 +283,18 @@ def printDMAstate():
 
 def parseCommand(addr, display=False):
 
-  size = 0
-
   word = read_u32(0x80000000 | addr)
   s = "0x%08X: Opcode: 0x%08X" % (addr, word)
 
   if ((word & 0xe0000003) == 0x20000000):
-    print("unhandled opcode type: old jump")
+    print("old jump")
     #state->get_jmp_shadow = control->dma_get;
-    #control->dma_get = word & 0x1fffffff;
     #NV2A_DPRINTF("pb OLD_JMP 0x%" HWADDR_PRIx "\n", control->dma_get);
+    addr = word & 0x1fffffff
   elif ((word & 3) == 1):
-    print("unhandled opcode type: jump")
+    print("jump")
     #state->get_jmp_shadow = control->dma_get;
-    #control->dma_get = word & 0xfffffffc;
+    addr = word & 0xfffffffc
   elif ((word & 3) == 2):
     print("unhandled opcode type: call")
     #if (state->subroutine_active) {
@@ -279,9 +304,11 @@ def parseCommand(addr, display=False):
     #state->subroutine_return = control->dma_get;
     #state->subroutine_active = true;
     #control->dma_get = word & 0xfffffffc;
+    addr = 0
   elif (word == 0x00020000):
     # return
     print("unhandled opcode type: return")
+    addr = 0
   elif ((word & 0xe0030003) == 0) or ((word & 0xe0030003) == 0x40000000):
     # methods
     method = word & 0x1fff;
@@ -291,7 +318,7 @@ def parseCommand(addr, display=False):
     #state->dcount = 0;
 
     s += "; Method: 0x%04X (%d times)" % (method, method_count)
-    size = 4 + method_count * 4
+    addr += 4 + method_count * 4
 
   else:
     print("unknown opcode type")
@@ -299,56 +326,186 @@ def parseCommand(addr, display=False):
   if display:
     print(s)
 
-  return size
+  return addr
+
+
+
+
+
+
+
+def dumpTexture(i, path):
+  offset = read_u32(0xFD401A24 + i * 4) # NV_PGRAPH_TEXOFFSET0
+  pitch = read_u32(0xFD4019DC + i * 4) # NV_PGRAPH_TEXCTL1_0_IMAGE_PITCH
+  fmt = read_u32(0xFD401A04 + i * 4) # NV_PGRAPH_TEXFMT0
+  fmt_color = (fmt >> 8) & 0x7F
+  width_shift = (fmt >> 20) & 0xF
+  height_shift = (fmt >> 24) & 0xF
+  width = 1 << width_shift
+  height = 1 << height_shift
+  print("Texture %d [0x%08X, %d x %d (pitch: 0x%X), format %d]" % (i, offset, width, height, pitch, fmt_color))
+
+  img = None
+
+  pitch = 0
+  bits_per_pixel = 0
+
+  if fmt_color == 6:
+    pitch = width * 4
+    bits_per_pixel = 32
+    img = Image.new( 'RGBA', (width, height))
+    swizzled = True
+  elif fmt_color == 12: # DXT1
+    img = Image.new( 'RGB', (width, height))
+    pitch = width // 2
+    bits_per_pixel = 4
+    swizzled = False
+  elif fmt_color == 15: # DXT5
+    img = Image.new( 'RGBA', (width, height))
+    pitch = width * 1
+    bits_per_pixel = 8
+    swizzled = False
+  elif fmt_color == 17:
+    img = Image.new( 'RGB', (width, height))
+    pitch = width * 2
+    bits_per_pixel = 16
+    swizzled = True
+  elif fmt_color == 18:
+    pitch = width * 4
+    bits_per_pixel = 32
+    img = Image.new( 'RGBA', (width, height))
+    swizzled = False
+  else:
+    print("\n\nUnknown texture format: 0x%X\n\n" % fmt_color)
+    raise("lolz")
+    return
+
+  if pitch != 0:
+    data = read(0x80000000 | offset, pitch * height)
+
+    if img == None:
+
+      pass #FIXME: Save raw data to disk
+
+    else:
+
+      if swizzled:
+        data = nv2a._Unswizzle(data, bits_per_pixel, (width, height), pitch)
+      
+      pixels = img.load() # create the pixel map
+
+      if fmt_color == 6 or fmt_color == 18:
+        for x in range(img.size[0]):    # for every col:
+          for y in range(img.size[1]):    # For every row
+            alpha = data[4 * (y * width + x) + 3]
+            red = data[4 * (y * width + x) + 2]
+            green = data[4 * (y * width + x) + 1]
+            blue = data[4 * (y * width + x) + 0]
+            pixels[x, y] = (red, green, blue, alpha) # set the colour accordingly
+
+      elif fmt_color == 12:
+        img = Image.frombytes("RGBA", img.size, data, 'bcn', 1) # DXT1
+
+      #FIXME:   'dxt3': ('bcn', 2),
+
+      elif fmt_color == 15:
+        img = Image.frombytes("RGBA", img.size, data, 'bcn', 3) # DXT5
+
+      elif fmt_color == 17:
+        for x in range(img.size[0]):    # for every col:
+          for y in range(img.size[1]):    # For every row
+            pixel = struct.unpack_from("<H", data, 2 * (y * width + x))[0]
+            red = pixel & 0x1F
+            green = (pixel >> 5) & 0x3F
+            blue = (pixel >> 11) & 0x1F
+            #FIXME: Fill lower bits with lowest bit
+            pixels[x, y] = (red << 3, green << 2, blue << 3, 255) # set the colour accordingly
+    
+      img.save(path)
+    
+
+
+
 
 
 
 def main():
 
-  DebugPrint = False
+  global abortNow
 
-  timeout = 2000
+  DebugPrint = True
+  StateDumping = False
 
+  command_index = 0
+  flipStallCount = 0
 
+  print("\n\nSearching stable PB state\n\n")
+  
   while True:
 
-    # Pause the puller, so that the CACHE is full and PB stops running
-    resume_fifo_puller()
-    pause_fifo_puller()
+    # Stop consuming CACHE entries.
+    disable_pgraph_fifo()
 
-    # Check out where the PB currently is and where it was supposed to go
+    # Kick the pusher, so that it fills the cache CACHE.
+    resume_fifo_pusher()
+    pause_fifo_pusher()
+
+    # Now drain the CACHE
+    enable_pgraph_fifo()
+
+    # Check out where the PB currently is and where it was supposed to go.
     v_dma_put_addr_real = read_u32(dma_put_addr)
     v_dma_get_addr = read_u32(dma_get_addr)
 
-    # As there might be unfinished commands in the cache, we finish those
+    # Check if we have any methods left to run and skip those.
     v_dma_state = read_u32(dma_state)
     v_dma_method_count = (v_dma_state >> 18) & 0x7ff
-    v_dma_get_addr += 4 * v_dma_method_count
+    v_dma_get_addr += v_dma_method_count * 4
 
-    # Make sure we have reached a point where the PB has data to run
-    if (v_dma_get_addr != v_dma_put_addr_real):
-      break
+    # Hide all commands from the PB by setting PUT = GET.
+    v_dma_put_addr_target = v_dma_get_addr
+    write_u32(dma_put_addr, v_dma_put_addr_target)
 
-  # Show where we stopped and the full PB
-  dumpPBState()
-  printDMAstate()
+    # Resume pusher - The PB can't run yet, as it has no commands to process.
+    resume_fifo_pusher()
 
-  # Hide all commands from the PB by setting PUT = GET
-  v_dma_put_addr_target = v_dma_get_addr
-  write_u32(dma_put_addr, v_dma_put_addr_target)
+  
+    # We might get issues where the pusher missed our PUT (miscalculated).
+    # This can happen as `v_dma_method_count` is not the most accurate.
+    # Probably because the DMA is halfway through a transfer.
+    # So we pause the pusher again to validate our state
+    pause_fifo_pusher()
 
-  # Enable puller - nothing bad can happen, as it has no commands to process
-  # The PB can't run yet
-  resume_fifo_puller()
+    v_dma_put_addr_target_check = read_u32(dma_put_addr)
+    v_dma_get_addr_check = read_u32(dma_get_addr)
+
+    # We want the PB to be paused
+    if v_dma_get_addr_check != v_dma_put_addr_target_check:
+      print("Oops GET did not reach PUT!")
+      continue
+
+    # Ensure that we are at the correct offset
+    if v_dma_put_addr_target_check != v_dma_put_addr_target:
+      print("Oops PUT was modified!")
+      continue
+
+    # It's all good, so we can continue idling here
+    resume_fifo_pusher()
+
+    break
+   
+  print("\n\nStepping through PB\n\n")
 
   # Step through the PB until we finish.
   while(v_dma_get_addr != v_dma_put_addr_real):
 
-    # Get size of current command.
-    size = parseCommand(v_dma_get_addr, DebugPrint)
+    print("@0x%08X; wants to be at 0x%08X" % (v_dma_get_addr, v_dma_put_addr_target))
 
-    # If we don't know the size, we have to abort.
-    if size == 0:
+    # Get size of current command.
+    v_dma_put_addr_target = parseCommand(v_dma_get_addr, DebugPrint)
+
+    # If we don't know where this command ends, we have to abort.
+    if v_dma_put_addr_target == 0:
       print("Aborting due to unknown PB command")
 
       # Recover the real address as Xbox would get stuck otherwise
@@ -367,43 +524,24 @@ def main():
       
       for method_index in range(method_count):
 
+        if method == 0x0100:
+          data = read_u32(0x80000000 | (v_dma_get_addr + (method_index + 1) * 4))
+          print("No operation, data: 0x%08X!" % data)
+
+        if method == 0x0130:
+          print("Flip stall!")
+          flipStallCount += 1
+
         if method == 0x17fc:
           print("Set begin end")
-          # Check for texture addresses
-          for i in range(4):
-            offset = read_u32(0xFD401A24 + i * 4) # NV_PGRAPH_TEXOFFSET0
-            pitch = read_u32(0xFD4019DC + i * 4) # NV_PGRAPH_TEXCTL1_0_IMAGE_PITCH
-            fmt = read_u32(0xFD401A04 + i * 4) # NV_PGRAPH_TEXFMT0
-            fmt_color = (fmt >> 8) & 0x7F
-            width_shift = (fmt >> 20) & 0xF
-            height_shift = (fmt >> 24) & 0xF
-            width = 1 << width_shift
-            height = 1 << height_shift
-            print("Texture %d [0x%08X, %d x %d (pitch: 0x%X), format %d]" % (i, offset, width, height, pitch, fmt_color))
-
-            if fmt_color == 6:
-
-              data = read(0x80000000 | offset, width * height * 4)
+          if StateDumping:
+            # Check for texture addresses
+            for i in range(4):
               try:
-                img = Image.new( 'RGBA', (width, height)) # create a new black image
-                pixels = img.load() # create the pixel map
-
-                pitch = width * 4
-                bits_per_pixel = 32
-                data = nv2a._Unswizzle(data, bits_per_pixel, (width, height), pitch)
-
-                for x in range(img.size[0]):    # for every col:
-                  for y in range(img.size[1]):    # For every row
-                    red = data[4 * (y * width + x) + 2]
-                    green = data[4 * (y * width + x) + 1]
-                    blue = data[4 * (y * width + x) + 0]
-                    alpha = data[4 * (y * width + x) + 3]
-                    pixels[x, y] = (red, green, blue, 255) # set the colour accordingly
-
-                img.save("tex-%d---timeout_%d.png" % (i, timeout))
-              except:
-                print("Unexpected error:", sys.exc_info()[0])
-                pass
+                dumpTexture(i, "tex-%d---index_%d.png" % (i, command_index))
+              except Exception as err:
+                traceback.print_exc()
+                abortNow = True
 
         # Check for texture addresses
         for i in range(4):
@@ -411,39 +549,52 @@ def main():
             data = read_u32(0x80000000 | (v_dma_get_addr + (method_index + 1) * 4))
             print("Texture %d [0x%08X]" % (i, data))
 
-        if method == 0x0130:
-          print("Flip stall!")
         
         if not method_nonincreasing:
           method += 4
 
-    # Disable PGRAPH, so it can't run anything from CACHE.
-    s1 = read_u32(pgraph_state)
-    write_u32(pgraph_state, s1 & 0xFFFFFFFE)
 
-    # Calculate address of the next command and set it as PB target.
-    # This allows the PB to move into the CACHE.
-    v_dma_put_addr_target = v_dma_get_addr + size
-    write_u32(dma_put_addr, v_dma_put_addr_target)
-    if DebugPrint: print("At 0x%08X, target is 0x%08X (Real: 0x%08X)" % (v_dma_get_addr, v_dma_put_addr_target, v_dma_put_addr_real))
+    # Loop while this command is being ran.
+    # This is necessary because a whole command might not fit into CACHE.
+    # So we have to process it chunk by chunk.
+    firstAttempt = True
+    command_base = v_dma_get_addr
+    while v_dma_get_addr >= command_base and v_dma_get_addr < v_dma_put_addr_target:
+      if DebugPrint: print("At 0x%08X, target is 0x%08X (Real: 0x%08X)" % (v_dma_get_addr, v_dma_put_addr_target, v_dma_put_addr_real))
+      if DebugPrint: printDMAstate()
 
-    # We have now moved commands to the CACHE.
-    # Disable the cache update now.
-    pause_fifo_pusher()
+      # Disable PGRAPH, so it can't run anything from CACHE.
+      disable_pgraph_fifo()
+      wait_until_pgraph_idle()
 
-    # Run the commands we have moved to CACHE now, by enabling PGRAPH.
-    s1 = read_u32(pgraph_state)
-    write_u32(pgraph_state, s1 | 1)
+      # Change our write position in the PB or enable more CACHE writes again.
+      # The CACHE is filling up now.
+      if firstAttempt:
+        write_u32(dma_put_addr, v_dma_put_addr_target)
+        firstAttempt = False
+      else:
+        resume_fifo_pusher()
 
-    # See if the PB target was modified and restore if necessary.
-    v_dma_put_addr_new_real = read_u32(dma_put_addr)
-    if (v_dma_put_addr_new_real != v_dma_put_addr_target):
-      print("PB was modified! Restoring.")
-      write_u32(dma_put_addr, v_dma_put_addr_target)
-      v_dma_put_addr_real = v_dma_put_addr_new_real
+      # Our planned commands are in CACHE now, so disable the cache update now.
+      pause_fifo_pusher()
 
-    # Get the updated PB address.
-    v_dma_get_addr = read_u32(dma_get_addr)
+      # Run the commands we have moved to CACHE, by enabling PGRAPH.
+      enable_pgraph_fifo()
+
+      # Get the updated PB address.
+      v_dma_get_addr = read_u32(dma_get_addr)
+
+      # See if the PB target was modified.
+      # If necessary, we recover the current target to keep the GPU stuck on our
+      # current command.
+      v_dma_put_addr_new_real = read_u32(dma_put_addr)
+      if (v_dma_put_addr_new_real != v_dma_put_addr_target):
+        print("PB was modified! Got 0x%08X, but expected: 0x%08X; Restoring." % (v_dma_put_addr_new_real, v_dma_put_addr_target))
+        #FIXME: Ensure that the pusher is still disabled, or we might be
+        #       screwed already. Because the pusher probably pushed new data
+        #       to the CACHE which we attempt to avoid.
+        write_u32(dma_put_addr, v_dma_put_addr_target)
+        v_dma_put_addr_real = v_dma_put_addr_new_real
 
     # Also show that we processed the commands.
     if DebugPrint: dumpPBState()
@@ -451,12 +602,21 @@ def main():
     # We can continue the cache updates now.
     resume_fifo_pusher()
 
-    timeout = timeout - 1
-    print(timeout)
-    if timeout == 0:
+    #FIXME: Scary state. FIFO and PGRAPH enabled; only protection is GET = PUT.
+    #       If the CPU does a write here (such as from a fence callback), then
+    #       we just got screwed bigtime..
+
+    # Increment command index
+    command_index += 1
+
+    # Check if the user wants to exit
+    if abortNow:
       write_u32(dma_put_addr, v_dma_put_addr_real)
       break
 
+  print("\n\nFinished PB\n\n")
+
+  print("Recorded %d flip stalls" % flipStallCount)
 
 if __name__ == '__main__':
   main()
