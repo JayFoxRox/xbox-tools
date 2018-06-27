@@ -14,6 +14,12 @@ from PIL import Image
 
 abortNow = False
 
+def delay():
+  #FIXME: if this returns `True`, the functions below should have their own
+  #       loops which check for command completion
+  #time.sleep(0.01)
+  return False
+
 def signal_handler(signal, frame):
   global abortNow
   if abortNow == False:
@@ -49,7 +55,7 @@ def wait_until_pgraph_idle():
 def enable_pgraph_fifo():
   s1 = read_u32(pgraph_state)
   write_u32(pgraph_state, s1 | 0x00000001)
-  time.sleep(0.001) # FIXME: Loop until puller is stopped instead
+  if delay(): pass
 
 def wait_until_pusher_idle():
   while(read_u32(get_state) & (1 << 4)):
@@ -59,33 +65,33 @@ def pause_fifo_puller():
   # Idle the puller and pusher
   s1 = read_u32(get_state)
   write_u32(get_state, s1 & 0xFFFFFFFE)
-  time.sleep(0.001) # FIXME: Loop until puller is stopped instead
+  if delay(): pass
   #print("Puller State was 0x" + format(s1, '08X'))
 
 def pause_fifo_pusher():
   s1 = read_u32(put_state)
   write_u32(put_state, s1 & 0xFFFFFFFE)
-  time.sleep(0.001) # FIXME: Loop until pusher is stopped instead
+  if delay(): pass
   if False:
     s1 = read_u32(0xFD003200)
     write_u32(0xFD003200, s1 & 0xFFFFFFFE)
-    time.sleep(0.01) # FIXME: Loop until pusher is stopped instead
+    if delay(): pass
     #print("Pusher State was 0x" + format(s1, '08X'))
 
 def resume_fifo_puller():
   # Resume puller and pusher
   s2 = read_u32(get_state)
   write_u32(get_state, (s2 & 0xFFFFFFFE) | 1) # Recover puller state
-  time.sleep(0.001) # FIXME: Loop until puller is resumed instead
+  if delay(): pass
 
 def resume_fifo_pusher():
   if False:
     s2 = read_u32(0xFD003200)
     write_u32(0xFD003200, s2 & 0xFFFFFFFE | 1)
-    time.sleep(0.01) # FIXME: Loop until pusher is resumed instead
+    if delay(): pass
   s2 = read_u32(put_state)
   write_u32(put_state, (s2 & 0xFFFFFFFE) | 1) # Recover pusher state
-  time.sleep(0.001) # FIXME: Loop until pusher is resumed instead
+  if delay(): pass
 
 def step_fifo(steps):
   #FIXME: Assert that the puller is stopped!
@@ -292,9 +298,16 @@ def parseCommand(addr, display=False):
     #NV2A_DPRINTF("pb OLD_JMP 0x%" HWADDR_PRIx "\n", control->dma_get);
     addr = word & 0x1fffffff
   elif ((word & 3) == 1):
-    print("jump")
-    #state->get_jmp_shadow = control->dma_get;
     addr = word & 0xfffffffc
+    print("jump 0x%08X" % addr)
+    #state->get_jmp_shadow = control->dma_get;
+
+    if False:
+      # Get the address after the first instruction after a jump
+      # This is a hack, because it seems that the NV2A refuses to jump if there
+      # is no room for a real method
+      addr = parseCommand(addr, display)
+
   elif ((word & 3) == 2):
     print("unhandled opcode type: call")
     #if (state->subroutine_active) {
@@ -433,7 +446,7 @@ def main():
 
   global abortNow
 
-  DebugPrint = True
+  DebugPrint = False
   StateDumping = False
 
   command_index = 0
@@ -489,12 +502,12 @@ def main():
       print("Oops PUT was modified!")
       continue
 
-    # It's all good, so we can continue idling here
-    resume_fifo_pusher()
-
     break
    
   print("\n\nStepping through PB\n\n")
+
+  # Start measuring time
+  begin_time = time.monotonic()
 
   # Step through the PB until we finish.
   while(v_dma_get_addr != v_dma_put_addr_real):
@@ -553,37 +566,10 @@ def main():
         if not method_nonincreasing:
           method += 4
 
+    # Queue this command
+    write_u32(dma_put_addr, v_dma_put_addr_target)
 
-    # Loop while this command is being ran.
-    # This is necessary because a whole command might not fit into CACHE.
-    # So we have to process it chunk by chunk.
-    firstAttempt = True
-    command_base = v_dma_get_addr
-    while v_dma_get_addr >= command_base and v_dma_get_addr < v_dma_put_addr_target:
-      if DebugPrint: print("At 0x%08X, target is 0x%08X (Real: 0x%08X)" % (v_dma_get_addr, v_dma_put_addr_target, v_dma_put_addr_real))
-      if DebugPrint: printDMAstate()
-
-      # Disable PGRAPH, so it can't run anything from CACHE.
-      disable_pgraph_fifo()
-      wait_until_pgraph_idle()
-
-      # Change our write position in the PB or enable more CACHE writes again.
-      # The CACHE is filling up now.
-      if firstAttempt:
-        write_u32(dma_put_addr, v_dma_put_addr_target)
-        firstAttempt = False
-      else:
-        resume_fifo_pusher()
-
-      # Our planned commands are in CACHE now, so disable the cache update now.
-      pause_fifo_pusher()
-
-      # Run the commands we have moved to CACHE, by enabling PGRAPH.
-      enable_pgraph_fifo()
-
-      # Get the updated PB address.
-      v_dma_get_addr = read_u32(dma_get_addr)
-
+    def JumpCheck(v_dma_put_addr_real):
       # See if the PB target was modified.
       # If necessary, we recover the current target to keep the GPU stuck on our
       # current command.
@@ -593,18 +579,50 @@ def main():
         #FIXME: Ensure that the pusher is still disabled, or we might be
         #       screwed already. Because the pusher probably pushed new data
         #       to the CACHE which we attempt to avoid.
+
+        s1 = read_u32(put_state)
+        if s1 & 1:
+          print("PB was modified and pusher was already active!")
+          time.sleep(60.0)
+
         write_u32(dma_put_addr, v_dma_put_addr_target)
         v_dma_put_addr_real = v_dma_put_addr_new_real
+      return v_dma_put_addr_real
+
+    # Loop while this command is being ran.
+    # This is necessary because a whole command might not fit into CACHE.
+    # So we have to process it chunk by chunk.
+    command_base = v_dma_get_addr
+    while v_dma_get_addr >= command_base and v_dma_get_addr < v_dma_put_addr_target:
+      if DebugPrint: print("At 0x%08X, target is 0x%08X (Real: 0x%08X)" % (v_dma_get_addr, v_dma_put_addr_target, v_dma_put_addr_real))
+      if DebugPrint: printDMAstate()
+
+      # Disable PGRAPH, so it can't run anything from CACHE.
+      disable_pgraph_fifo()
+      wait_until_pgraph_idle()
+
+      # This block should be atomic
+      if True:
+
+        # Avoid running bad code, if the PUT was modified sometime during
+        # this command
+        v_dma_put_addr_real = JumpCheck(v_dma_put_addr_real)
+
+        # Kick our planned commands into CACHE now
+        resume_fifo_pusher()
+        pause_fifo_pusher()
+
+      # Run the commands we have moved to CACHE, by enabling PGRAPH.
+      enable_pgraph_fifo()
+
+      # Get the updated PB address.
+      v_dma_get_addr = read_u32(dma_get_addr)
+
+    # It's possible that the CPU updated the PUT after execution
+    v_dma_put_addr_real = JumpCheck(v_dma_put_addr_real)
 
     # Also show that we processed the commands.
     if DebugPrint: dumpPBState()
-
-    # We can continue the cache updates now.
-    resume_fifo_pusher()
-
-    #FIXME: Scary state. FIFO and PGRAPH enabled; only protection is GET = PUT.
-    #       If the CPU does a write here (such as from a fence callback), then
-    #       we just got screwed bigtime..
 
     # Increment command index
     command_index += 1
@@ -616,7 +634,14 @@ def main():
 
   print("\n\nFinished PB\n\n")
 
-  print("Recorded %d flip stalls" % flipStallCount)
+  # We can continue the cache updates now.
+  resume_fifo_pusher()
+
+  # Finish measuring time
+  end_time = time.monotonic()
+  duration = end_time - begin_time
+
+  print("Recorded %d flip stalls and %d PB commands (%.2f commands / second)" % (flipStallCount, command_index, command_index / duration))
 
 if __name__ == '__main__':
   main()
