@@ -4,6 +4,10 @@
 
 from xbox import *
 
+
+
+from io import StringIO
+import sys
 import time
 import struct
 
@@ -54,12 +58,12 @@ class Timer:
     self.last_ticks = self.ticks
     self.last_update_time = update_time
 
-  def Print(self, flush=False):
+  def Print(self):
     ticks = self.GetTicks()
     frequency = self.GetFrequency()
     actual_frequency = self.GetActualFrequency()
     #FIXME: Also show non-adjusted ticks somewhere?
-    print("%-14s %12d [f: %12.1f Hz] = %5.1f s [f: %12.1f Hz]" % (self.name + ":", ticks, frequency, ticks / frequency, actual_frequency), flush=flush)
+    print("%-14s %12d [f: %12.1f Hz] = %5.1f s [f: %12.1f Hz]" % (self.name + ":", ticks, frequency, ticks / frequency, actual_frequency))
 
 
 class KeTickCountTimer(Timer):
@@ -123,9 +127,9 @@ class GPUTimer(Timer):
     
   def Print(self):
     super().Print()
-    print("  Core clockrate:  (    XTAL *   n) / (1 <<   p) /   m", flush=False)
-    print("                   (%-8d * %3d) / (1 << %3d) / %3d = %.1f Hz" % (NV2A_CRYSTAL_FREQ, self.ndiv, self.pdiv, self.mdiv, self.GPUClockrate), flush=False)
-    print("  Timer clockrate: %.1f / (%d / %d)" % (self.GPUClockrate, self.GPUNumerator, self.GPUDenominator), flush=False)
+    print("  Core clockrate:  (    XTAL *   n) / (1 <<   p) /   m")
+    print("                   (%-8d * %3d) / (1 << %3d) / %3d = %.1f Hz" % (NV2A_CRYSTAL_FREQ, self.ndiv, self.pdiv, self.mdiv, self.GPUClockrate))
+    print("  Timer clockrate: %.1f / (%d / %d)" % (self.GPUClockrate, self.GPUNumerator, self.GPUDenominator))
 
 
 if __name__ == "__main__":
@@ -143,9 +147,17 @@ if __name__ == "__main__":
 
   while(True):
 
+    # Setup a temporary stdout, so we can buffer the print for all timers
+    real_stdout = sys.stdout
+    sys.stdout = buffer_stdout = StringIO()
+
+    # Update and print each timer
     for timer in timers:
       timer.UpdateTicks()
       timer.Print()
 
-    print(flush=True)
+    # Switch to the real stdout again to output all timers at once
+    sys.stdout = real_stdout
+    print(buffer_stdout.getvalue(), flush=True)
+
     time.sleep(0.02)
