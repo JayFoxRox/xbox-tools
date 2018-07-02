@@ -197,7 +197,7 @@ if True:
   xbdm_base = xbdm_module['base']
   DmResumeThread_addr = resolve_export(35, image_base=xbdm_base)
 
-  hack = "0F20C05025FFFFFEFF0F22C08B5424088B1A8B4A048B4208E2028A03E203668B03E2028B03E2028803E203668903E2028903894208580F22C0B80000DB02C20400"
+  hack = "0F20C05025FFFFFEFF0F22C08B5424088B1A8B4A048B4208E2028A03E203668B03E2028B03E2028803E203668903E2028903E2126089C141497408FF720C83C204EBF5FFD361894208580F22C0B80000DB02C20400"
   xbdm_command("setmem addr=0x" + format(DmResumeThread_addr, 'X') + " data=" + hack)
  
   #hack_bank = DmResumeThread_addr + (len(hack) // 2) # Put communication base behind the hack code [pretty shitty..]
