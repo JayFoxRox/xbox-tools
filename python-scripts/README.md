@@ -2,7 +2,20 @@
 
 This is a collection of scripts to access various Xbox hardware.
 
-## Usage
+
+## Usage for updated scripts
+
+Some code might be using [xboxpy](https://github.com/XboxDev/xboxpy) already.
+Please check the respective xboxpy documentation.
+
+Also initialize the submodules to be able use those scripts:
+
+```
+git submodule update --init --recursive
+```
+
+
+## Usage for legacy scripts
 
 * All stuff is internally imported by the `xbox` module. So: `import xbox`
 * You can define the interface you want to use using environment variable 'XBOX_IF':
