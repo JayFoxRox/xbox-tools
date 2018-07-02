@@ -60,6 +60,24 @@ def RtlInitAnsiString(DestinationString, SourceString):
   #IN PCSZ SourceString
   return call_stdcall(289, "<II", DestinationString, SourceString)
 
+def XboxEEPROMKey():
+  return pe.resolve_export(321)
+
+def XboxHDKey():
+  return pe.resolve_export(323)
+
+def XboxSignatureKey():
+  return pe.resolve_export(325)
+
+def XboxLANKey():
+  return pe.resolve_export(353)
+
+def XboxAlternateSignatureKeys():
+  return pe.resolve_export(354)
+
+def XePublicKeyData():
+  return pe.resolve_export(355)
+
 def call_stdcall(function, types, *arguments):
   address = pe.resolve_export(function)
   registers = api.call(address, struct.pack(types, *arguments))
