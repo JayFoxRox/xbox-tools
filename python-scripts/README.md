@@ -5,14 +5,8 @@ This is a collection of scripts to access various Xbox hardware.
 
 ## Usage for updated scripts
 
-Some code might be using [xboxpy](https://github.com/XboxDev/xboxpy) already.
-Please check the respective xboxpy documentation.
-
-Also initialize the submodules to be able use those scripts:
-
-```
-git submodule update --init --recursive
-```
+[Install xboxpy](https://github.com/XboxDev/xboxpy) and read its usage documentation.
+Once you configured your xboxpy connection, you should be able to run these scripts.
 
 
 ## Usage for legacy scripts
