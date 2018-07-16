@@ -3,7 +3,7 @@
 # A standalone AC97 audio player, based on XAudio from OpenXDK
 # The interrupt related code has been removed as it's currently not supported.
 
-from xbox import *
+from xboxpy import *
 
 import sys
 import time

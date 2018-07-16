@@ -20,7 +20,7 @@ seconds = 10.0
 bin_index = 0
 
 
-from xbox import *
+from xboxpy import *
 
 from concurrent.futures import *
 

@@ -2,7 +2,7 @@
 
 # Takes a screenshot
 
-from xbox import *
+from xboxpy import *
 
 from PIL import Image
 

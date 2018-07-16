@@ -6,7 +6,7 @@
 # http://xboxdevwiki.net/Xbox_Game_Disc
 
 
-from xbox import *
+from xboxpy import *
 
 
 #FIXME: Move these libc style functions to some helper module?

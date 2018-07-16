@@ -1,21 +1,10 @@
-# Xbox python scripts
+# Xbox Python-Scripts
 
 This is a collection of scripts to access various Xbox hardware.
 
 
-## Usage for updated scripts
+## Getting Started
 
-[Install xboxpy](https://github.com/XboxDev/xboxpy) and read its usage documentation.
+[Install xboxpy](https://github.com/XboxDev/xboxpy#install) and read its usage documentation.
+
 Once you configured your xboxpy connection, you should be able to run these scripts.
-
-
-## Usage for legacy scripts
-
-* All stuff is internally imported by the `xbox` module. So: `import xbox`
-* You can define the interface you want to use using environment variable 'XBOX_IF':
-  * 'XBDM' (default)
-  * 'nxdk-rdt`
-  * 'gdb' (auto-detected if the `gdb` module exists)
-* Some interfaces will also allow you to specify the target Xbox using the 'XBOX' environment variable ('Host:Port')
-
-Not all interfaces support all functionality at this point.

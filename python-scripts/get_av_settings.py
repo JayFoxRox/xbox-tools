@@ -6,7 +6,7 @@
 # http://xboxdevwiki.net/AV_Cables#Supported_signals_.2F_AV_cables
 
 
-from xbox import *
+from xboxpy import *
 
 
 #FIXME: Move these libc style functions to some helper module?

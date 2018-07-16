@@ -3,7 +3,7 @@
 # Run this from a clean Xbox environment (= not while a game is running)
 # NXDK-RDT is a good environment
 
-from xboxpy.xboxpy import *
+from xboxpy import *
 
 import sys
 import time

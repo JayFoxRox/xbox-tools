@@ -2,7 +2,7 @@
 
 # Prints information about some of the Xbox timers
 
-from xboxpy.xboxpy import *
+from xboxpy import *
 
 
 

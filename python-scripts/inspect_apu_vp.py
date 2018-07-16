@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from xbox import *
+from xboxpy import *
 
 #FIXME: Move to fields, however, globals() has another context there >.<
 def Field(offset_name, mask_name=None):
