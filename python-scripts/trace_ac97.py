@@ -13,7 +13,7 @@
 seconds = 10.0
 
 
-from xbox import *
+from xboxpy import *
 
 # Open outputs
 wav = aci.export_wav("pcm_trace.wav")
