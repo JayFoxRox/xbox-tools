@@ -1,5 +1,6 @@
 #define QUIET
 #define USE_XISO
+//#define DO_HTTP
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -17,15 +18,22 @@
 #include <hal/video.h>
 #endif
 
+#ifdef DO_HTTP
+#include "network.h"
+#include "http_client.h"
+#endif
+
+#ifdef USE_XISO
 #include "xiso_driver.h"
+#endif
 
 #if 1
 // We use AllocatePool, to avoid filling up the interesting memory regions
 //FIXME: Instead, keep track of all allocations, so we can undo it
 //FIXME: This is still very unstable; we should be reserving more space for our own XBE instead
 //       The issue is that real NtVirtualAlloc is still being used in the stdlib
-#define malloc(x) ExAllocatePool(x)
-#define free(x) ExFreePool(x)
+#define _malloc(x) ExAllocatePool(x)
+#define _free(x) ExFreePool(x)
 #endif
 
 #define FIX_STDIO
@@ -295,7 +303,7 @@ NTSTATUS NTAPI HookedHalWriteSMBusValue(
 }
 
 static char* get_ansi_buffer(PANSI_STRING o) {
-  char* s = malloc(o->Length + 1);
+  char* s = _malloc(o->Length + 1);
   memcpy(s, o->Buffer, o->Length);
   s[o->Length] = '\0';
   return s;
@@ -310,8 +318,8 @@ NTSTATUS NTAPI HookedIoCreateSymbolicLink
   char* SymbolicLinkName_str = get_ansi_buffer(SymbolicLinkName);
   char* DeviceName_str = get_ansi_buffer(DeviceName);
   write_log("Called IoCreateSymbolicLink(%s, %s). Returned %d\n", SymbolicLinkName_str, DeviceName_str, status);
-  free(DeviceName_str);
-  free(SymbolicLinkName_str);
+  _free(DeviceName_str);
+  _free(SymbolicLinkName_str);
   return status;
 }
 
@@ -815,6 +823,82 @@ static __NO_RETURN void relocate_loader(uint32_t base_address) {
   loader_xbe->entry_point();
 }
 
+
+
+
+
+
+
+
+bool index_requested = false;
+char* index_html = NULL;
+unsigned int index_html_length = 0;
+
+void header_callback(const char* field, const char* value, void* user) {
+  write_log("header: '%s' = '%s'\n", field, value);
+  if (!strcmp(field, "Content-Range")) {
+    if(!strcmp(value, "None")) {
+      write_log("\nRange not supported\n");
+    } else if(!memcmp(value, "bytes ", 6)) {
+      write_log("\nRange: %s\n", &value[6]);
+      char* split_value = strdup(value);
+
+      // Get part until '-': from
+      char* dash = strchr(split_value, '-');
+      assert(dash != NULL);
+      *dash = '\0';
+      int from = atoi(split_value);
+
+      // Get part until '/': to
+      char* slash = strchr(&dash[1], '/');
+      assert(slash != NULL);
+      *slash = '\0';
+      int to = atoi(&dash[1]);
+
+      // Get part until end: len
+      int len = atoi(&slash[1]);
+
+      write_log("Range is  %d  %d  %d (%d)\n", from, to, len, to - from + 1);
+      write_log("okay?");
+      free(split_value);
+      write_log("okay??!");
+    } else {
+      assert(false);
+    }
+  }
+}
+
+//FIXME: Add a callback for reporting HTTP status and message length
+void message_callback(unsigned long long offset, const void* buffer, unsigned long long length, void* user) {
+  write_log("message\n");
+  unsigned long long new_length = offset + length;
+  if (new_length > index_html_length) {
+    index_html = realloc(index_html, new_length);
+    index_html_length = new_length;
+  }
+  memcpy(&index_html[offset], buffer, length);
+}
+
+void close_callback(void* user) {
+  if (index_html) {
+    write_log("close: '%s' (%d bytes)\n", index_html, index_html_length);
+    free(index_html);
+    index_html = NULL;
+    index_html_length = 0;
+  }
+  index_requested = false;
+}
+
+void error_callback(void* user) {
+  write_log("error\n");
+}
+
+
+
+
+
+
+
 int main() {
 
   //FIXME: Allocate the space right behind our binary
@@ -894,6 +978,16 @@ int main() {
   }
 #endif
 #endif
+
+
+#ifdef DO_HTTP
+  // Load the HTTP client for testing
+  network_setup();
+  const char* host = "192.168.177.1";
+  unsigned short host_port = 8000;
+#endif
+
+
 
   char* xbe_path_readable;
 #ifdef USE_XISO
@@ -975,7 +1069,6 @@ int main() {
   PsTerminateSystemThread(STATUS_SUCCESS);
 #endif
 
-
   //FIXME: Put this into a thread?
   int t = 0;
   while(1) {
@@ -984,7 +1077,22 @@ int main() {
       memory_statistics();
     }
 
+#if 0
+#ifdef DO_HTTP
+    if (index_requested == false) {
+      index_requested = true;
+      write_log("Starting request\n");
+      memory_statistics();
+      http_client_request(host, host_port, "/robots.txt", "Range: bytes=4-999\r\n", header_callback, message_callback, close_callback, error_callback, NULL);
+    }
+#endif
+#endif
+
     XSleep(1000);
     t++;
   }
+
+#ifdef DO_HTTP
+  network_cleanup();
+#endif
 }
