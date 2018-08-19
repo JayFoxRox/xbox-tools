@@ -1,8 +1,5 @@
 #define QUIET
-#define FIX_STDIO
-#define FIX_STRLEN
-#define FIX_BOOL
-#define FIX_ASSERT
+#define USE_XISO
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -12,10 +9,15 @@
 #include <assert.h>
 
 #include <hal/xbox.h>
-#include <hal/fileio.h>
 #include <xboxkrnl/xboxkrnl.h>
+
+#ifndef QUIET
 #include <xboxrt/debug.h>
 #include <pbkit/pbkit.h>
+#include <hal/video.h>
+#endif
+
+#include "xiso_driver.h"
 
 #if 1
 // We use AllocatePool, to avoid filling up the interesting memory regions
@@ -26,133 +28,11 @@
 #define free(x) ExFreePool(x)
 #endif
 
-#ifdef FIX_ASSERT
-#undef assert
-#define assert(x)
-#endif
-
-#ifdef FIX_BOOL
-typedef _Bool bool;
-#endif
-
-#ifdef FIX_STRLEN
-// Yup! Even strlen is broken in nxdk..
-size_t fixed_strlen(const char *s1) {
-  size_t i = 0;
-  while (s1[i] != '\0') { i++; }
-  return i;
-}
-#define strlen(s1) fixed_strlen(s1)
-#endif
-
-#ifdef FIX_STDIO
-
-#define SEEK_SET 1
-#define SEEK_END 2
-
-typedef struct {
-  int handle;
-} FILE;
-
-int fread(void* buffer, int chunk_count, int chunk_size, FILE* f) {
-  unsigned int numberOfBytesRead;
-  int r = XReadFile(f->handle, buffer, chunk_count * chunk_size, &numberOfBytesRead);
-  if (r != TRUE) {
-    debugPrint("Read failed\n");
-    while(1);
-  }
-  if (numberOfBytesRead != chunk_count * chunk_size) {
-    debugPrint("Read too few bytes\n");
-    while(1);
-  }
-  return numberOfBytesRead / chunk_size;
-}
-
-int fwrite(const void* buffer, int chunk_count, int chunk_size, FILE* f) {
-  unsigned int numberOfBytesWritten;
-  XWriteFile(f->handle, buffer, chunk_count * chunk_size, &numberOfBytesWritten);
-  return numberOfBytesWritten / chunk_size;
-}
-
-int fseek(FILE* f, int offset, int whence) {
-  int moveMethod;
-  switch(whence) {
-  case SEEK_SET:
-    break;
-  case SEEK_END: {
-    // We can't use FILE_END from XSetFilePointer due to bugs; do our own thing
-    int filesize;
-    NTSTATUS status = XGetFileSize(f->handle, &filesize);
-    if (status != TRUE) {
-      debugPrint("Unable to get file-size for fseek\n");
-      while(1);
-    }
-    offset += filesize;
-    break;
-  }
-  default:
-    debugPrint("Bad whence: %d\n", whence);
-    while(1);
-  }
-
-  int newFilePointer;
-  XSetFilePointer(f->handle, offset, &newFilePointer, FILE_BEGIN);
-
-  return 0;
-}
-
-FILE* fopen(char* path, char* mode) {
-  int handle;
-
-  int create;
-  int access;
-  int whence;
-  if (!strcmp(mode, "rb")) {
-    create = OPEN_EXISTING;
-    access = GENERIC_READ;
-    whence = SEEK_SET;
-  } else if (!strcmp(mode, "wb")) {
-    create = CREATE_ALWAYS;
-    access = GENERIC_WRITE;
-    whence = SEEK_SET;
-  } else if (!strcmp(mode, "ab")) {
-    create = OPEN_ALWAYS;
-    access = GENERIC_READ | GENERIC_WRITE;
-    whence = SEEK_END;
-  } else {
-    return NULL;
-  }
-
-  NTSTATUS status = XCreateFile(&handle, path, access, 0, create, 0);
-
-  // This is technically not an error for any modes we support
-  if (status == ERROR_ALREADY_EXISTS) {
-    status = STATUS_SUCCESS;
-  }
-
-  // Error out if no file was loaded
-  if (status != STATUS_SUCCESS) {
-    return NULL;
-  }
-
-  // Create a FILE object
-  FILE* f = malloc(sizeof(FILE));
-  f->handle = handle;
-
-  // Go to the intended location within file
-  fseek(f, 0, whence);
-
-  return f;
-}
-
-int fclose(FILE* f) {
-  XCloseHandle(f->handle);
-  free(f);
-}
-
-#endif
-
-
+#define FIX_STDIO
+#define FIX_STRLEN
+#define FIX_BOOL
+#define FIX_ASSERT
+#include "fixes.h"
 
 // Section will be copied to new versions of loader
 #define __PERSIST_NAME "!persist"
@@ -234,7 +114,7 @@ typedef struct {
   uint32_t unk0x124;
   void(*entry_point)(void); // 0x128
   uint8_t unk0x12C[0x2C];
-  uint32_t kernel_thunk;
+  uint32_t kernel_thunk; //FIXME: Use struct* datatype which has all kernel exports
 } Xbe;
 
 char loader_path[520] __PERSIST = { 0 };
@@ -249,7 +129,7 @@ Xbe* loader_xbe __PERSIST = DEFAULT_BASE;
 uint8_t large_image[8 * 1024 * 1024] __INIT;
 
 static void probe_memory(uint32_t address, uint32_t size);
-static void write_log(const char* format, ...) {
+void write_log(const char* format, ...) {
   char buffer[512];
   va_list argList;
   va_start(argList, format);
@@ -791,57 +671,57 @@ static Xbe* load_xbe(const char* path, uint32_t base_address, bool allow_hooks) 
 
 #if 1
         if (ordinal == 49) {
-          *kernel_thunk = HookedHalReturnToFirmware;
+          *kernel_thunk = (uint32_t)HookedHalReturnToFirmware;
         }
 
         // Do a hook for testing, which swaps LED red and green
         if (ordinal == 50) {
           write_log("Hooking to: %d\n", HookedHalWriteSMBusValue);
-          *kernel_thunk = HookedHalWriteSMBusValue;
+          *kernel_thunk = (uint32_t)HookedHalWriteSMBusValue;
         }
 
         if (ordinal == 67) {
-          *kernel_thunk = HookedIoCreateSymbolicLink;
+          *kernel_thunk = (uint32_t)HookedIoCreateSymbolicLink;
         }
 
         if (ordinal == 103) {
-          *kernel_thunk = HookedKeGetCurrentIrql;
+          *kernel_thunk = (uint32_t)HookedKeGetCurrentIrql;
         }
 
         if (ordinal == 104) {
-          *kernel_thunk = HookedKeGetCurrentThread;
+          *kernel_thunk = (uint32_t)HookedKeGetCurrentThread;
         }
 
         if (ordinal == 107) {
-          *kernel_thunk = HookedKeInitializeDpc;
+          *kernel_thunk = (uint32_t)HookedKeInitializeDpc;
         }
 
         if (ordinal == 149) {
-          *kernel_thunk = HookedKeSetTimer;
+          *kernel_thunk = (uint32_t)HookedKeSetTimer;
         }
 
         if (ordinal == 184) {
-          *kernel_thunk = HookedNtAllocateVirtualMemory;
+          *kernel_thunk = (uint32_t)HookedNtAllocateVirtualMemory;
         }
 
         if (ordinal == 190) {
-          *kernel_thunk = HookedNtCreateFile;
+          *kernel_thunk = (uint32_t)HookedNtCreateFile;
         }
 
         if (ordinal == 217) {
-          *kernel_thunk = HookedNtQueryVirtualMemory;
+          *kernel_thunk = (uint32_t)HookedNtQueryVirtualMemory;
         }
 
         if (ordinal == 255) {
-          *kernel_thunk = HookedPsCreateSystemThreadEx;
+          *kernel_thunk = (uint32_t)HookedPsCreateSystemThreadEx;
         }
 
         if (ordinal == 320) {
-          *kernel_thunk = HookedRtlZeroMemory;
+          *kernel_thunk = (uint32_t)HookedRtlZeroMemory;
         }
 
         if (ordinal == 327) {
-          *kernel_thunk = HookedXeLoadSection;
+          *kernel_thunk = (uint32_t)HookedXeLoadSection;
         }
 #endif
 
@@ -942,6 +822,7 @@ int main() {
 
 #ifndef QUIET
   // Setup debug output
+  XVideoSetMode(640, 480, 32, REFRESH_DEFAULT);
   pb_init();
   pb_show_debug_screen();
 #endif
@@ -977,6 +858,9 @@ int main() {
   }
 #endif
 
+  // Beyond this point, no allocations should be done
+  // Otherwise we might pollute the address space
+
 #if 1
   // Unloads specified XBE. Only happens while re-locating
   if (old_loader_xbe != NULL) {
@@ -986,6 +870,8 @@ int main() {
     old_loader_xbe = NULL;
     memory_statistics();
   }
+
+  //FIXME: Reserve memory again until we actually need this space for a new XBE?
 #endif
 
 #if 1
@@ -1009,17 +895,40 @@ int main() {
 #endif
 #endif
 
+  char* xbe_path_readable;
+#ifdef USE_XISO
   // FIXME: Get path for the XBE which is to be loaded
 
-  char* xbe_path_readable;
+  // Mount an XISO now
+  char* iso_path;
+
+//  iso_path = "E:\\apps\\tests\\meshes\\meshes.iso";
+  iso_path = "Smashing Drive.iso";
+
+  // Create the virtual drive
+  write_log("Creating XISO driver\n");
+  NTSTATUS status = xiso_driver_create_device(iso_path);
+  if (status != STATUS_SUCCESS) {
+    write_log("Unable to create XISO driver\n");
+  }
+
+  // Mount it where the DVD drive should be
+  write_log("Mounting XISO device\n");
+  XMountDrive('D', "\\Device\\XIso0");
+
+  // Pick the default.xbe for startup
+  xbe_path_readable = "D:\\default.xbe";
+
+#else
 
 //  xbe_path_readable = "E:\\apps\\tests\\led\\default.xbe";
 //  xbe_path_readable = "E:\\apps\\tests\\nxdk-mesh\\default.xbe";
 //  xbe_path_readable = "E:\\apps\\tests\\CreateDevice\\CreateDevice.xbe";
 //  xbe_path_readable = "E:\\apps\\tests\\meshes\\meshes.xbe";
 //  xbe_path_readable = "E:\\apps\\tests\\Fog4627\\default.xbe";
-  xbe_path_readable = "F:\\Games\\Halo NTSC\\default.xbe";
 //  xbe_path_readable = "F:\\Games\\JSRF SGT\\SegaJSRF.xbe";
+  xbe_path_readable = "F:\\Games\\Halo NTSC\\default.xbe";
+#endif
 
   // We need a device path
   char xbe_path[520];
@@ -1042,6 +951,8 @@ int main() {
   XCreateThread((void *)xbe_starter_thread, xbe, NULL);
 #endif
 
+#ifndef USE_XISO
+  //FIXME: This is absolutely necessary when running games from HDD!
   // Remount D: drive
   char xbe_directory[520];
   strcpy(xbe_directory, xbe_path);
@@ -1049,11 +960,9 @@ int main() {
   *lastSlash = '\0';
   XMountDrive('D', xbe_directory);
   write_log("Remapped DVD drive to '%s'\n", xbe_directory);
+#endif
 
 #if 1
-
-  memory_statistics();
-
   // Run the XBE directly
   xbe->entry_point();
 #endif
@@ -1071,7 +980,11 @@ int main() {
   int t = 0;
   while(1) {
     write_log("%d; ", t);
-    t++;
+    if (t % 10 == 0) {
+      memory_statistics();
+    }
+
     XSleep(1000);
+    t++;
   }
 }
