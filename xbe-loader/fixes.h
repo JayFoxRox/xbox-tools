@@ -127,6 +127,7 @@ static FILE* fopen(char* path, char* mode) {
 static int fclose(FILE* f) {
   XCloseHandle(f->handle);
   free(f);
+  return 0;
 }
 
 #endif

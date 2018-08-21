@@ -63,9 +63,9 @@ typedef struct _DISK_GEOMETRY {
 
 #define CTL_CODE(t,f,m,a) (((t)<<16)|((a)<<14)|((f)<<2)|(m))
 
-#define	METHOD_BUFFERED	0
+#define  METHOD_BUFFERED  0
 
-#define	FILE_READ_ACCESS	0x0001
+#define  FILE_READ_ACCESS  0x0001
 
 #define FILE_DEVICE_CD_ROM 0x00000002
 
@@ -84,7 +84,7 @@ typedef struct _DISK_GEOMETRY {
 
 #define SL_PENDING_RETURNED 1
 
-#define STATUS_INVALID_DEVICE_REQUEST	((NTSTATUS)0xC0000010L)
+#define STATUS_INVALID_DEVICE_REQUEST  ((NTSTATUS)0xC0000010L)
 #define STATUS_REQUEST_ABORTED        ((NTSTATUS)0xC0000240L)
 
 //FIXME: Bug in nxdk typedef? This should return PIO_STACK_LOCATION according to MSDN

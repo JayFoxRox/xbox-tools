@@ -10,18 +10,20 @@
 #include "lwip/sys.h"
 #include "lwip/tcpip.h"
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
-
+#if 1
 void write_log(const char* format, ...);
 #define debugPrint(x, ...) write_log(x, ## __VA_ARGS__)
+#endif
 
 #define assert(x) if (!(x)) { debugPrint("\nAssert failed '%s' in %s:%d\n\n", #x, __FILE__, __LINE__); }
 
 #include <xboxrt/debug.h>
+
+#include "network.h"
 
 
 typedef struct {
@@ -29,12 +31,12 @@ typedef struct {
   char* host;
   char* abs_path;
   char* request_header;
-  uint64_t message_offset;
+  unsigned long long message_offset;
   int status;
   bool message_started;
   char* line_buffer;
-  unsigned int line_buffer_length;
-  unsigned int line_buffer_offset;
+  size_t line_buffer_length;
+  size_t line_buffer_offset;
   unsigned int timeout;
 
   void(*header_callback)(const char* field, const char* value, void* user);
@@ -47,9 +49,12 @@ typedef struct {
 } Request;
 
 static void destroy_request(Request* request) {
-	if(request->pcb != NULL) {
+	if (request->pcb != NULL) {
 		tcp_close(request->pcb);
 	}
+  if (request->line_buffer != NULL) {
+    free(request->line_buffer);
+  }
   //FIXME: Check for null pointers?
   free(request->host);
   free(request->abs_path);
@@ -74,7 +79,7 @@ void http_client_request(const char* host, unsigned short host_port, const char*
   // Lookup host
   //FIXME: Might want to do this elsewhere?
   ip4_addr_t host_ip;
-#if LWIP_DNS
+#if 0 //LWIP_DNS
   debugPrint("Resolving hostname '%s'\n", host);
   err_t err = netconn_gethostbyname (host, &host_ip);
   if (err != ERR_OK) {
@@ -120,15 +125,22 @@ void http_client_request(const char* host, unsigned short host_port, const char*
 	}
 	tcp_arg(request->pcb, request);
 
-  // Search a local port where we can bind successfully
-	//FIXME: Can we auto pick this via lwip?
-	uint16_t local_port = 4545;
-	while(tcp_bind(request->pcb, IP_ADDR_ANY, local_port) != ERR_OK) {
-		local_port++;
-	}
+  // We poll ~1000ms; measured in TCP coarse grained steps (500ms per step)
+  unsigned int poll_interval = 2;
+
+  // Setup callbacks
+  tcp_sent(request->pcb, sent_callback);
+  tcp_poll(request->pcb, poll_callback, poll_interval);
+  tcp_recv(request->pcb, recv_callback);
+  tcp_err(request->pcb, err_callback);
 
   // Connect to the server
-	tcp_connect(request->pcb, &host_ip, host_port, connected_callback);
+  debugPrint("Connecting\n");
+	err_t err = tcp_connect(request->pcb, &host_ip, host_port, connected_callback);
+  if (err != ERR_OK) {
+    debugPrint("Failed to connect\n");
+  }
+  debugPrint("Handoff\n");
 }
 
 static err_t connected_callback(void *arg, struct tcp_pcb *pcb, err_t err) {
@@ -144,6 +156,8 @@ static err_t connected_callback(void *arg, struct tcp_pcb *pcb, err_t err) {
     return ERR_OK;
   }
 
+  debugPrint("Constructing request\n");
+
   //FIXME: What prevents us from doing this in the request setup already?
   //       We could save some allocations then
   char* request_str = malloc(1024 + strlen(request->abs_path) + strlen(request->host) + strlen(request->request_header));
@@ -156,21 +170,15 @@ static err_t connected_callback(void *arg, struct tcp_pcb *pcb, err_t err) {
                        "Connection: close\r\n"
                        "%s\r\n", request->abs_path, request->host, request->request_header);
 
-  // This is in TCP fine grained steps; so roughly 500ms per step
-  unsigned int poll_interval = 2;
-
-  // Setup callbacks
-  tcp_sent(request->pcb, sent_callback);
-  tcp_poll(request->pcb, poll_callback, poll_interval);
-  tcp_recv(request->pcb, recv_callback);
-  tcp_err(request->pcb, err_callback);
-
   // Send request
-  tcp_write(request->pcb, request_str, strlen(request_str), 1);
+  debugPrint("Writing\n");
+  tcp_write(request->pcb, request_str, strlen(request_str), TCP_WRITE_FLAG_COPY);
+  debugPrint("Written\n");
   tcp_output(request->pcb);
-  debugPrint("Request sent\n");
+  debugPrint("Flushed\n");
 
   //FIXME: Free the stuff we don't need anymore already?
+  free(request_str);
 
   return ERR_OK;
 }
@@ -183,6 +191,7 @@ static err_t sent_callback(void *arg, struct tcp_pcb *pcb, u16_t len) {
   return ERR_OK;
 }
 
+//FIXME: This does not work?!
 static err_t poll_callback(void *arg, struct tcp_pcb *pcb) {
   Request* request = arg;
   assert(request->pcb == pcb);
@@ -208,24 +217,21 @@ static err_t recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
 
   debugPrint("recv %d\n", p);
 
-	char * page = NULL;
-
   if (err != ERR_OK) {
     assert(false);
   }
 
   if (p != NULL) {
 
-
-    // Receive data
+    // Mark data as received to speed up TCP
     tcp_recved(pcb, p->tot_len);
 
-    // Add payload (p) to state
+    // Receive data and walk the data vector
     struct pbuf* temp_p = p;
     while(temp_p != NULL) {
 
-      void* payload = temp_p->payload;
-      int len = temp_p->len;
+      const void* payload = temp_p->payload;
+      size_t len = temp_p->len;
 
       if (!request->message_started) {
 
@@ -267,7 +273,7 @@ static err_t recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
           // Replace CR by zero termination, so we can read the string
           cr[0] = '\0';
 
-          debugPrint("Parsing line '%s'\n", line);
+          // debugPrint("Parsing line '%s'\n", line);
           if (request->status == 0) {
             //FIXME: Parse this line instead
             //FIXME: WTF? Why does python return 1.0?
@@ -314,18 +320,21 @@ static err_t recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
 
         // Remove processed data from line buffer
         debugPrint("Cleaning line buffer\n");
-        unsigned int processed_bytes = line - request->line_buffer;
+        size_t processed_bytes = line - request->line_buffer;
         request->line_buffer_offset -= processed_bytes;
         memmove(request->line_buffer, line, request->line_buffer_offset);
 
         // Possibly submit all the data which still made it into the line buffer
-        debugPrint("Providing remaining payload\n");
         payload = request->line_buffer;
         len = request->line_buffer_offset;
+
+        debugPrint("Providing remaining line-buffer as payload (0x%x; %d bytes; line-buffer is %d bytes)\n", payload, len, request->line_buffer_length);
+      } else {
+        debugPrint("Taking real package data: 0x%x; %d bytes\n", payload, len);
       }
 
       if (request->message_started && len > 0) {
-        debugPrint("Doing message callback\n");
+        //debugPrint("Doing message callback\n");
         request->message_callback(request->message_offset, payload, len, request->user);
         request->message_offset += len;
       }
@@ -334,11 +343,12 @@ static err_t recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
     }
     
     // Remove all payloads from the queue
-    while(p != NULL) {
-      temp_p = p->next;
+//    while(p != NULL) {
+//      temp_p = p->next;
+//FIXME: Does this *really* free the whole chain?
       pbuf_free(p);
-      p = temp_p;
-    }
+//      p = temp_p;
+//    }
 
   } else {
     request->close_callback(request->user);
@@ -347,7 +357,10 @@ static err_t recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
 
     return ERR_OK;
   }
- 
+
+  // Ask for more data
+//  network_poll();
+
   return ERR_OK;
 }
 
