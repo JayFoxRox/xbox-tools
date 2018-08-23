@@ -25,6 +25,7 @@
 #define write_log(fmt, ...) debugPrint(fmt, ## __VA_ARGS__)
 #else
 void write_log(const char* format, ...);
+void write_log_crit(const char* format, ...);
 #define write_log(fmt, ...) write_log(fmt, ## __VA_ARGS__)
 #endif
 
@@ -210,6 +211,8 @@ static unsigned long long http_client_range_request(PIRP irp, const char* host, 
 
   write_log("HTTP Request started; Header:\n%s\n", header_buffer);
 
+  ULONG start_time = KeTickCount;
+
   // Start request which will handle the event
   http_client_request(host, host_port, abs_path, header_buffer, http_header_callback, http_message_callback, http_close_callback, http_error_callback, &r);
 
@@ -222,7 +225,17 @@ static unsigned long long http_client_range_request(PIRP irp, const char* host, 
   // Wait until event is done and free it
   KeWaitForSingleObject(&r.event, Executive, KernelMode, FALSE, NULL);
 
-  write_log("HTTP Request finished\n");
+  // Calculate length of the received data
+  unsigned long long received_length = r.message_to - r.message_from + 1;
+
+  // Generate some statistics and report finish
+  ULONG end_time = KeTickCount;
+  unsigned int duration = end_time - start_time;
+  if (duration == 0) {
+    duration = 1;
+  }
+  unsigned int datarate = (unsigned int)received_length / duration;
+  write_log_crit("HTTP Request finished %d bytes in %d milliseconds (%d kB/s)\n", (int)received_length, duration, datarate);
 
   // If no data is requested, we will return the file length instead
   if ((r.buffer == NULL) && (r.request_offset == 0) && (r.request_length == 0)) {
@@ -230,7 +243,7 @@ static unsigned long long http_client_range_request(PIRP irp, const char* host, 
   }
 
   //FIXME: Get actual number of bytes read
-  return r.message_to - r.message_from + 1;
+  return received_length;
 }
 
 #else

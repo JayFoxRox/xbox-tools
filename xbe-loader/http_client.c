@@ -16,6 +16,7 @@
 
 #if 1
 void write_log(const char* format, ...);
+void write_log_crit(const char* format, ...);
 #define debugPrint(x, ...) write_log(x, ## __VA_ARGS__)
 #endif
 
@@ -38,6 +39,7 @@ typedef struct {
   size_t line_buffer_length;
   size_t line_buffer_offset;
   unsigned int timeout;
+  size_t received_bytes;
 
   void(*header_callback)(const char* field, const char* value, void* user);
   //FIXME: Add a callback for reporting HTTP status and message length
@@ -110,6 +112,7 @@ void http_client_request(const char* host, unsigned short host_port, const char*
   request->line_buffer_offset = 0;
   request->line_buffer_length = 0;
   request->timeout = 0;
+  request->received_bytes = 0;
   request->user = user;
 
   debugPrint("Will request '%s' from '%s' (%s) port %d\n", request->abs_path, request->host, ip4addr_ntoa(&host_ip), host_port);
@@ -171,14 +174,16 @@ static err_t connected_callback(void *arg, struct tcp_pcb *pcb, err_t err) {
                        "%s\r\n", request->abs_path, request->host, request->request_header);
 
   // Send request
-  debugPrint("Writing\n");
+  write_log_crit("Writing <<<%s>>>\n", request->request_header);
   tcp_write(request->pcb, request_str, strlen(request_str), TCP_WRITE_FLAG_COPY);
-  debugPrint("Written\n");
+  write_log_crit("Written\n");
   tcp_output(request->pcb);
-  debugPrint("Flushed\n");
+  write_log_crit("Flushed\n");
 
   //FIXME: Free the stuff we don't need anymore already?
   free(request_str);
+
+  write_log_crit("Free'd\n");
 
   return ERR_OK;
 }
@@ -186,6 +191,8 @@ static err_t connected_callback(void *arg, struct tcp_pcb *pcb, err_t err) {
 static err_t sent_callback(void *arg, struct tcp_pcb *pcb, u16_t len) {
   Request* request = arg;
   assert(request->pcb == pcb);
+
+  write_log_crit("Sent callback\n");
 
   request->timeout = 0;
   return ERR_OK;
@@ -196,10 +203,13 @@ static err_t poll_callback(void *arg, struct tcp_pcb *pcb) {
   Request* request = arg;
   assert(request->pcb == pcb);
 
+  write_log_crit("Poll callback %d\n", request->received_bytes);
+
   request->timeout++;
 
   // Timeout is called roughly every second, so wait 5 seconds
   if(request->timeout >= 5) {
+    write_log_crit("Aborting\n");
     tcp_abort(pcb);
 
     request->error_callback(request->user);
@@ -215,7 +225,8 @@ static err_t recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
   Request* request = arg;
   assert(request->pcb == pcb);
 
-  debugPrint("recv %d\n", p);
+  write_log("recv %d\n", p);
+  request->timeout = 0;
 
   if (err != ERR_OK) {
     assert(false);
@@ -223,15 +234,14 @@ static err_t recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
 
   if (p != NULL) {
 
-    // Mark data as received to speed up TCP
-    tcp_recved(pcb, p->tot_len);
-
     // Receive data and walk the data vector
     struct pbuf* temp_p = p;
     while(temp_p != NULL) {
 
       const void* payload = temp_p->payload;
       size_t len = temp_p->len;
+
+      request->received_bytes += len;
 
       if (!request->message_started) {
 
@@ -342,13 +352,11 @@ static err_t recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
       temp_p = temp_p->next;
     }
     
+    // Mark data as received to speed up TCP
+    tcp_recved(pcb, p->tot_len);
+
     // Remove all payloads from the queue
-//    while(p != NULL) {
-//      temp_p = p->next;
-//FIXME: Does this *really* free the whole chain?
-      pbuf_free(p);
-//      p = temp_p;
-//    }
+    pbuf_free(p);
 
   } else {
     request->close_callback(request->user);

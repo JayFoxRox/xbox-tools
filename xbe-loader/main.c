@@ -1,5 +1,6 @@
 #define QUIET
 #define USE_XISO
+//#define HOOK_NIC
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -148,6 +149,8 @@ uint8_t large_image[8 * 1024 * 1024] __INIT;
 
 static void probe_memory(uint32_t address, uint32_t size);
 void write_log(const char* format, ...) {
+}
+void write_log_crit(const char* format, ...) {
   char buffer[512];
   sprintf(buffer, "%d          ", KeTickCount);
   va_list argList;
@@ -431,6 +434,42 @@ NTSTATUS NTAPI HookedNtQueryVirtualMemory
   return status;
 }
 
+DWORD NTAPI HookedPhyGetLinkState(
+    BOOLEAN update
+) {
+#ifdef HOOK_NIC
+  // @param update
+  // @return Flags describing the status of the NIC
+  DWORD ret = PhyGetLinkState(update);
+#else
+  write_log_crit("Emulating PhyGetLinkState\n");
+
+  // Pretend there's nothing active
+  DWORD ret = 0;
+#endif
+  write_log_crit("Called PhyGetLinkState(%d). Returned %d\n", update, ret);
+  return ret;
+}
+
+NTSTATUS NTAPI HookedPhyInitialize
+(
+    BOOLEAN forceReset,
+    PVOID param OPTIONAL
+) {
+#ifdef HOOK_NIC
+  // @param forceReset Whether to force a reset
+  // @param param Optional parameters (seemingly unused)
+  // @return Status code (zero on success)
+  NTSTATUS status = PhyInitialize(forceReset, param);
+#else
+  write_log_crit("Emulating PhyInitialize\n");
+
+  // Pretend there was some error (unknown which one this is, but it's handled by some code)
+  NTSTATUS status = 0x801F0001;
+#endif
+  write_log_crit("Called PhyInitialize(%d, %d). Returned %d\n", forceReset, param, status);
+  return status;
+}
 
 NTSTATUS NTAPI HookedPsCreateSystemThreadEx
 (
@@ -731,6 +770,14 @@ static Xbe* load_xbe(const char* path, uint32_t base_address, bool allow_hooks) 
 
         if (ordinal == 217) {
           *kernel_thunk = (uint32_t)HookedNtQueryVirtualMemory;
+        }
+
+        if (ordinal == 252) {
+          *kernel_thunk = (uint32_t)HookedPhyGetLinkState;
+        }
+
+        if (ordinal == 253) {
+          *kernel_thunk = (uint32_t)HookedPhyInitialize;
         }
 
         if (ordinal == 255) {
