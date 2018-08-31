@@ -54,16 +54,21 @@ class Timer:
     update_time = time.time()
     self.ticks = self.RetrieveTicks()
     if self.last_ticks is not None and self.last_update_time is not None:
-      self.actual_frequency = (self.ticks - self.last_ticks) / (update_time - self.last_update_time)
+      if update_time > self.last_update_time:
+        self.actual_frequency = (self.ticks - self.last_ticks) / (update_time - self.last_update_time)
     self.last_ticks = self.ticks
     self.last_update_time = update_time
 
   def Print(self):
     ticks = self.GetTicks()
     frequency = self.GetFrequency()
-    actual_frequency = self.GetActualFrequency()
     #FIXME: Also show non-adjusted ticks somewhere?
-    print("%-14s %12d [f: %12.1f Hz] = %5.1f s [f: %12.1f Hz]" % (self.name + ":", ticks, frequency, ticks / frequency, actual_frequency))
+    if frequency > 0:
+      actual_frequency = self.GetActualFrequency()
+      realtime_information = " = %5.1f s [f: %12.1f Hz]" % (ticks / frequency, actual_frequency)
+    else:
+      realtime_information = ""
+    print("%-14s %12d [f: %12.1f Hz]%s" % (self.name + ":", ticks, frequency, realtime_information))
 
 
 class KeTickCountTimer(Timer):
@@ -114,9 +119,12 @@ class GPUTimer(Timer):
     self.mdiv = self.nvpll_coeff & NV_PRAMDAC_NVPLL_COEFF_MDIV
     self.ndiv = (self.nvpll_coeff & NV_PRAMDAC_NVPLL_COEFF_NDIV) >> 8
     self.pdiv = (self.nvpll_coeff & NV_PRAMDAC_NVPLL_COEFF_PDIV) >> 16
-    self.GPUClockrate = (NV2A_CRYSTAL_FREQ * self.ndiv) / (1 << self.pdiv) / self.mdiv
-
-    return self.GPUClockrate / (self.GPUNumerator / self.GPUDenominator)
+    try:
+      self.GPUClockrate = (NV2A_CRYSTAL_FREQ * self.ndiv) / (1 << self.pdiv) / self.mdiv
+      return self.GPUClockrate / (self.GPUNumerator / self.GPUDenominator)
+    except:
+      self.GPUClockrate = 0
+      return 0
 
   def RetrieveTicks(self):
     GPUTimer0 = nv2a.read_u32(NV_PTIMER + NV_PTIMER_TIME_0)
