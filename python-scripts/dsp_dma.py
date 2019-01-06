@@ -15,10 +15,10 @@ import struct
 BUFFER_TO_DSP = False
 DSP_TO_BUFFER = True
 
-BUFFER_FIFO0 = 0x0
-BUFFER_FIFO1 = 0x1
-BUFFER_FIFO2 = 0x2
-BUFFER_FIFO3 = 0x3
+BUFFER_OUT_FIFO0 = 0x0
+BUFFER_OUT_FIFO1 = 0x1
+BUFFER_OUT_FIFO2 = 0x2
+BUFFER_OUT_FIFO3 = 0x3
 BUFFER_SCRATCH_CIRCULAR = 0xE
 BUFFER_SCRATCH = 0xF
 
@@ -37,7 +37,8 @@ DSP_MEMORY_Y = 0x1800
 DSP_MEMORY_P = 0x2800
 
 
-page_base = 0
+scratch_page_base = 0
+fifo_page_base = 0
 
 
 def dsp_write(base, address, data):
@@ -47,13 +48,20 @@ def dsp_write(base, address, data):
     apu.write_u32(base + (address + i)*4, word)
 
 def dsp_read_scratch(address, size):
-  global page_base
-  return read(page_base + address, size)  
+  global scratch_page_base
+  return read(scratch_page_base + address, size)  
 
 def dsp_write_scratch(address, data):
-  global page_base
-  write(page_base + address, data)
+  global scratch_page_base
+  write(scratch_page_base + address, data)
 
+def dsp_read_fifo(address, size):
+  global fifo_page_base
+  return read(fifo_page_base + address, size)  
+
+def dsp_write_fifo(address, data):
+  global fifo_page_base
+  write(fifo_page_base + address, data)
 
 def dsp_write_dma_command_block(address, next_block, is_eol, transfer_direction, buffer, sample_format, sample_count, dsp_address, buffer_offset, buffer_base, buffer_limit, control_flags, step):
 
@@ -86,37 +94,45 @@ def dsp_write_dma_command_block(address, next_block, is_eol, transfer_direction,
   dsp_write(NV_PAPU_GPXMEM, address, data)
 
 
-
 def dsp_stop():
-  global page_base
-  #FIXME: Pass dsp object which provides all the device details and registers instead
 
   # Reset GP and GP DSP
   apu.write_u32(NV_PAPU_GPRST, 0)
   time.sleep(0.1) # FIXME: Not sure if DSP reset is synchronous, so we wait for now
 
-  # Enable GP first, otherwise memory writes won't be handled
+  # Finish reset of GP, otherwise memory writes won't be handled
   apu.write_u32(NV_PAPU_GPRST, NV_PAPU_GPRST_GPRST)
 
-  # Allocate some scratch space (at least 2 pages!)
-  #FIXME: Why did I put: "(at least 2 pages!)" ?
-  page_count = 2
 
+def dsp_allocate_scatter_gather(page_count, alignment=0x4000):
   # Apparently NV_PAPU_GPSADDR has to be aligned to 0x4000 bytes?!
-  #FIXME: Free memory after running
-  page_head = ke.MmAllocateContiguousMemoryEx(4096, 0x00000000, 0xFFFFFFFF, 0x4000, ke.PAGE_READWRITE)
+  page_head = ke.MmAllocateContiguousMemoryEx(0x1000, 0x00000000, 0xFFFFFFFF, alignment, ke.PAGE_READWRITE)
   page_head_p = ke.MmGetPhysicalAddress(page_head)
-  apu.write_u32(NV_PAPU_GPSADDR, page_head_p)
-  page_base = ke.MmAllocateContiguousMemory(4096 * page_count)
+  page_base = ke.MmAllocateContiguousMemory(0x1000 * page_count)
   for i in range(0, page_count):
     write_u32(page_head + i * 8 + 0, ke.MmGetPhysicalAddress(page_base + 0x1000 * i))
     write_u32(page_head + i * 8 + 4, 0) # Control
+  return page_head_p, page_base
 
-  # I'm not sure if this is off-by-one (maybe `page_count - 1`)
-  apu.write_u32(NV_PAPU_GPSMAXSGE, page_count)
 
-  #FIXME: Set up a FIFO
-  
+def dsp_initialize():
+  global scratch_page_base
+  global fifo_page_base
+
+  # Allocate some scatter gather space (at least 2 pages! - for GP scratch)
+  #FIXME: Why did I put: "(at least 2 pages!)"? What about GP FIFO?
+
+  # Set up scratch space
+  scratch_page_count = 2
+  scratch_page_head, scratch_page_base = dsp_allocate_scatter_gather(scratch_page_count)
+  apu.write_u32(NV_PAPU_GPSADDR, scratch_page_head)
+  apu.write_u32(NV_PAPU_GPSMAXSGE, scratch_page_count - 1)
+
+  # Set up a FIFO
+  fifo_page_count = 2
+  fifo_page_head, fifo_page_base = dsp_allocate_scatter_gather(fifo_page_count)
+  apu.write_u32(NV_PAPU_GPFADDR, fifo_page_head)
+  apu.write_u32(NV_PAPU_GPFMAXSGE, fifo_page_count - 1)
 
 
 def dsp_write_code(code):
@@ -168,6 +184,9 @@ def dsp_start():
 
 # Stop the DSP
 dsp_stop()
+
+# Re-initialize the DSP
+dsp_initialize()
 
 # Prepare code to kick off DMA
 dsp_write_code("""
@@ -290,46 +309,104 @@ dsp_write_dma_command_block(0x100, 0x107, False, # address / next / eol
                             FLAGS_UNK0, # control flags
                             0x12) # step
 
+if False:
+  dsp_write_dma_command_block(0x107, 0x10E, False, # address / next / eol
+                              BUFFER_TO_DSP, # direction
+                              BUFFER_SCRATCH, # buffer
+                              FORMAT_16_BIT, 0x5, # sample-format / sample-count
+                              DSP_MEMORY_X + 0x700, # dsp-offset
+                              0x200, # buffer-offset
+                              0x0, 0x0, # buffer-base / buffer-size
+                              FLAGS_UNK0 | FLAGS_UNK9, # control flags
+                              0x20) # step
+
+#dsp dma block 0x0 (dsp -> buffer)
+#    next-block 0x0 (eol)
+#    control 0x080403:
+#        unk0 1
+#        buffer-offset-writeback 0
+#        buffer 0x0 (fifo0)
+#        unk9 0
+#        sample-format 0x1 (16 bit)
+#        dsp-step 0x20
+#    sample-count 0x201
+#    dsp-offset 0xc00 (x:$c00)
+#    buffer-offset 0xc000 (+ buffer-base 0x0 = 0xc000)
+#    buffer-size 0x1
+
+#FIXME: What is this used for?
+#apu.write_u32(NV_PAPU_FEMAXGPSGE, page_count - 1)
+
+# Unsure how these affect everything
+NV_PAPU_GPGET = 0x3FF00
+NV_PAPU_GPPUT = 0x3FF04
+apu.write_u32(NV_PAPU_GPGET, 0)
+apu.write_u32(NV_PAPU_GPPUT, 0)
+
+# Configure a FIFO
+
+# Output FIFO0-FIFO3; 0x10 step
+NV_PAPU_GPOFBASE0 = 0x3024
+NV_PAPU_GPOFEND0 = 0x3028 
+NV_PAPU_GPOFCUR0 = 0x302C
+for i in range(4):
+  apu.write_u32(NV_PAPU_GPOFBASE0 + i * 0x10, 0x200)
+  apu.write_u32(NV_PAPU_GPOFEND0 + i * 0x10, 0x300)
+  apu.write_u32(NV_PAPU_GPOFCUR0 + i * 0x10, 0x300 + i * 4) # absolute, so must be between base and end
+  print("0x%X" % apu.read_u32(NV_PAPU_GPOFCUR0 + i * 0x10))
+
+# Input FIFO0-FIFO1; 0x10 step
+NV_PAPU_GPIFBASE0 = 0x3064
+NV_PAPU_GPIFEND0 = 0x3068
+NV_PAPU_GPIFCUR0 = 0x306C
+for i in range(2):
+  apu.write_u32(NV_PAPU_GPIFBASE0 + i * 0x10, 0x0)
+  apu.write_u32(NV_PAPU_GPIFEND0 + i * 0x10, 0x1000)
+  apu.write_u32(NV_PAPU_GPIFCUR0 + i * 0x10, 0x200 + i * 4) # absolute, so must be between base and end
+
+
 dsp_write_dma_command_block(0x107, 0x10E, False, # address / next / eol
                             BUFFER_TO_DSP, # direction
                             BUFFER_SCRATCH, # buffer
-                            FORMAT_16_BIT, 0x5, # sample-format / sample-count
+                            FORMAT_16_BIT, 0x11, # sample-format / sample-count
                             DSP_MEMORY_X + 0x700, # dsp-offset
                             0x200, # buffer-offset
-                            0x0, 0x0, # buffer-base / buffer-size
-                            FLAGS_UNK0 | FLAGS_UNK9, # control flags
-                            0x20) # step
+                            0xF00BAA, 0xF00BAA, # buffer-base / buffer-size
+                            FLAGS_UNK0 | FLAGS_UNK4, # control flags
+                            2) # step
+
+
+
 
 dsp_write_dma_command_block(0x10E, 0, True, # address / next / eol
-                            BUFFER_TO_DSP, # direction
+                            DSP_TO_BUFFER, # direction
                             BUFFER_SCRATCH_CIRCULAR, # buffer
                             FORMAT_24_BIT_LSB, 0x1, # sample-format / sample-count
                             DSP_MEMORY_X + 0x800, # dsp-offset
                             0x0, # buffer-offset
-                            0x300, 0x100, # buffer-base / buffer-size
+                            0x400, 0x100, # buffer-base / buffer-size
                             0, # control flags
                             1) # step
 
 # Write a pattern to X memory at 0x200 (DMA source)
 #dsp_write(NV_PAPU_GPXMEM, 0x200, bytes(range(40)))
 for i in range(40):
-  apu.write_u32(NV_PAPU_GPXMEM + (0x600 + i) * 4, 0x123456)
-  apu.write_u32(NV_PAPU_GPXMEM + (0x700 + i) * 4, 0xFFFFFF)
-  apu.write_u32(NV_PAPU_GPXMEM + (0x800 + i) * 4, 0xFFFFFF)
+  apu.write_u32(NV_PAPU_GPXMEM + (0x700 + i) * 4, 1 + i)
+  apu.write_u32(NV_PAPU_GPXMEM + (0x800 + i) * 4, 1 + i)
 
 # Write a pattern to scratch memory (DMA destination)
-dsp_write_scratch(0x100, [0xFF] * 40)
-dsp_write_scratch(0x200, [0x00,0xFE,0xFF,0x00,0xEE,0xEE,0xEE,0xEE])
-dsp_write_scratch(0x300, [0x56,0x34,0x12,0xFF,0xEE,0xEE,0xEE,0xEE])
+dsp_write_fifo(0x1F0, [0xFF] * 80)
+dsp_write_scratch(0x1F0, [0xFF] * 80)
+dsp_write_scratch(0x2F0, [0xFF] * 80)
 
 # Place marker in YMEM
 apu.write_u32(NV_PAPU_GPYMEM + 0, 0x000000)
 assert(apu.read_u32(NV_PAPU_GPYMEM + 0) != 0x1337)
 
-def print_scratch(address, size, group_size, gap_size):
+def group_memory(address, size, group_size, gap_size, accessor):
   s = ""
   i = 0
-  for x in dsp_read_scratch(address, size):
+  for x in accessor(address, size):
     if i == 0 and group_size > 0:
       s += " "
     s += "%02X" % x
@@ -337,7 +414,13 @@ def print_scratch(address, size, group_size, gap_size):
     if i >= group_size and group_size > 0:
       s += " "
       i = -gap_size
-  print(s.strip())
+  return s.strip()
+
+def print_scratch(address, size, group_size, gap_size):
+  print("s: " + group_memory(address, size, group_size, gap_size, dsp_read_scratch))
+
+def print_fifo(address, size, group_size, gap_size):
+  print("f: " + group_memory(address, size, group_size, gap_size, dsp_read_fifo))
 
 def print_x(address, count, silent = False):
   words = []
@@ -352,13 +435,9 @@ def print_dma_block(address):
   print("dma x:$%x: %s" % (address, x))
   
 # Check input data
-old = print_dma_block(0x100)
-#print_scratch(0x100, 40, 3, 1)
-print_scratch(0x200, 40, 3, 1)
-print_scratch(0x300, 40, 3, 1)
-print_x(0x600, 10)
-#print_x(0x700, 10)
-#print_x(0x800, 10)
+old = print_dma_block(0x107)
+print_fifo(0x200, 40, 0, 0)
+print_scratch(0x300, 40, 0, 0)
 
 # Start DSP
 dsp_start()
@@ -371,13 +450,11 @@ while apu.read_u32(NV_PAPU_GPYMEM + 0) != 0x1337:
 print("Finished")
 
 # Check output data
-new = print_dma_block(0x100)
-print_scratch(0x100, 40, 0, 0)
-#print_scratch(0x200, 40, 0, 0)
-#print_scratch(0x300, 40, 0, 0)
-#print_x(0x600, 10)
+new = print_dma_block(0x107)
+print_fifo(0x1F0, 40, 0, 0)
+print_scratch(0x200, 40, 0, 0)
+print_scratch(0x300, 40, 0, 0)
 print_x(0x700, 10)
-print_x(0x800, 10)
 
 assert(new == old)
 
