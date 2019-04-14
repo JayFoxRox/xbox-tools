@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 
 #include "adpcm_block.h"
 
@@ -14,14 +15,34 @@ int main(int argc, char* argv[]) {
 
   FILE* in = fopen(argv[1], "rb");
 
-  // Read wave header
+  char riff_chunk_id[4];
+  fread(riff_chunk_id, 4, 1, in);
+  if (strncmp(riff_chunk_id, "RIFF", 4) != 0) {
+    fprintf(stderr, "Unexpected chunk: '%.4s'. Expected 'RIFF'\n", riff_chunk_id);
+    return 1;
+  }
 
-  // FIXME: Don't skip here, progress here
-  // 12 = chunk type ('fmt ')
-  // 16 = chunk  size (uint32_t chunk_size = 20)
-  fseek(in, 20, SEEK_SET);
+  uint32_t riff_chunk_size;
+  fread(&riff_chunk_size, 4, 1, in);
+  printf("RIFF size: %d\n", riff_chunk_size);
 
-  // Parse 'fmt ' chunk
+  char wave_chunk_id[4];
+  fread(wave_chunk_id, 4, 1, in);
+  if (strncmp(wave_chunk_id, "WAVE", 4) != 0) {
+    fprintf(stderr, "Unexpected chunk: '%.4s'. Expected 'WAVE'\n", wave_chunk_id);
+    return 1;
+  }
+
+  char fmt_chunk_id[4];
+  fread(fmt_chunk_id, 4, 1, in);
+  if (strncmp(fmt_chunk_id, "fmt ", 4) != 0) {
+    fprintf(stderr, "Unexpected chunk: '%.4s'. Expected 'fmt '\n", fmt_chunk_id);
+    return 1;
+  }
+
+  uint32_t fmt_chunk_size;
+  fread(&fmt_chunk_size, 4, 1, in);
+  printf("fmt size: %d\n", fmt_chunk_size);
 
   uint16_t format;
   fread(&format, 2, 1, in);
@@ -74,12 +95,17 @@ int main(int argc, char* argv[]) {
   //FIXME: What's in the extra-data?
 
   //FIXME: Skip possible fact headers etc
-// Read wave header
-  fseek(in, 56, SEEK_SET);
 
-  uint32_t chunk_size;
-  fread(&chunk_size, 4, 1, in);
-  printf("Data size: %u Bytes\n", chunk_size);
+  char data_chunk_id[4];
+  fread(data_chunk_id, 4, 1, in);
+  if (strncmp(data_chunk_id, "data", 4) != 0) {
+    fprintf(stderr, "Unexpected chunk: '%.4s'. Expected 'data'\n", data_chunk_id);
+    return 1;
+  }
+
+  uint32_t data_chunk_size;
+  fread(&data_chunk_size, 4, 1, in);
+  printf("Data size: %u Bytes\n", data_chunk_size);
 
   // Mark start of output
   printf("\n");
@@ -92,7 +118,7 @@ int main(int argc, char* argv[]) {
   // * In each block we have 2 samples per byte.
   // * One sample per channel from initial predictor.
   // (= 65 samples per block).
-  uint32_t blocks = chunk_size / block_align;
+  uint32_t blocks = data_chunk_size / block_align;
   printf("Duration: %u Blocks\n", blocks);
   uint32_t samples_per_block = (block_align - 4 * channels) * 2 + channels;
 
