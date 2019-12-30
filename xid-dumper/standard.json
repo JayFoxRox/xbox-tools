@@ -1,0 +1,115 @@
+{
+  "products": [
+    { "vid": "045E", "pid": "0202", "in-endpoint":2, "name":"duke" },
+    { "vid": "045E", "pid": "0289", "in-endpoint":1, "name":"controller-s" },
+    { "vid": "3767", "pid": "0101", "in-endpoint":2, "name":"speedster" }
+  ],
+  "in": {
+    "DPAD_UP": {
+      "offset": 2,
+      "mask": "01"
+    },
+    "DPAD_DOWN": {
+      "offset": 2,
+      "mask": "02" 	
+    },
+    "DPAD_LEFT": {
+      "offset": 2,
+      "mask": "04"
+    },
+    "DPAD_RIGHT ": {
+      "offset": 2,
+      "mask": "08" 	
+    },
+    "START": {
+      "offset": 2,
+      "mask": "10"
+    },
+    "BACK": {
+      "offset": 2,
+      "mask": "20"
+    },
+    "LEFT_THUMB": {
+      "offset": 2,
+      "mask": "40" 	
+    },
+    "RIGHT_THUMB": {
+      "offset": 2,
+      "mask": "80"
+    },
+    "pad?": {
+      "offset": 3,
+      "mask": "FF"
+    },
+    "A": {
+      "offset": 4,
+      "mask": "FF",
+      "notes": "Is analog"
+    },
+    "B": {
+      "offset": 5,
+      "mask": "FF",
+      "notes": "Is analog"
+    },
+    "X": {
+      "offset": 6,
+      "mask": "FF",
+      "notes": "Is analog"
+    },
+    "Y": {
+      "offset": 7,
+      "mask": "FF",
+      "notes": "Is analog"
+    },
+    "BLACK": {
+      "offset": 8,
+      "mask": "FF",
+      "notes": "Is analog"
+    },	
+    "WHITE": {
+      "offset": 9,
+      "mask": "FF",
+      "notes": "Is analog"
+    },	
+    "LEFT_TRIGGER": {
+      "offset": 10,
+      "mask": "FF",
+      "notes": "Is analog"
+    },	
+    "RIGHT_TRIGGER": {
+      "offset": 11,
+      "mask": "FF",
+      "notes": "Is analog"
+    },	
+    "sThumbLX": {
+      "offset": 12,
+      "mask": "FFFF",
+      "signed": true
+    },	
+    "sThumbLY": {
+      "offset": 14,
+      "mask": "FFFF",
+      "signed": true	
+    },	
+    "sThumbRX": {
+      "offset": 16,
+      "mask": "FFFF",
+      "signed": true
+    },	
+    "sThumbRY": {
+      "offset": 18,
+      "mask": "FFFF",
+      "signed": true
+    }
+  },
+  "out": {
+    "Left motor": {
+      "offset": 2,
+      "mask": "FFFF"
+    },
+    "Right motor": {
+      "offset": 4,
+      "mask": "FFFF"
+    }
+  }
+}
