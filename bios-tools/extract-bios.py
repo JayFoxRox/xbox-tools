@@ -481,13 +481,21 @@ def extract_bios():
 if __name__ == '__main__':
 
   # Read arguments
-  mcpx_rom = load(sys.argv[1])
+  mcpx_rom_path = sys.argv[1]
+  if mcpx_rom_path.strip() != "":
+    mcpx_rom = load(mcpx_rom_path)
+  else:
+    mcpx_rom = None
   flash_rom = load(sys.argv[2])
   if len(sys.argv) >= 4:
     print("Loading eeprom")
     eeprom = load(sys.argv[3])
   else:
     eepom = None
+
+  # Assume that there's no MCPX if no path was provided (for debug bios)
+  if mcpx_rom == None:
+    mcpx_rom = flash_rom[-512:]
 
   # Work around some unicorn oddity
   def my_except_hook(exctype, value, traceback):
