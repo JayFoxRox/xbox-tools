@@ -247,6 +247,8 @@ def hook_out(uc, port, size, value, user_data):
           pass
 
         pass
+      elif smbus.slave == 0xD4:
+        print("Focus video encoder write access")
       elif smbus.slave == 0xE1:
         #FIXME: what device is this?
         print("Unknown SMBus read access")
