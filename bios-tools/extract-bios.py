@@ -78,6 +78,14 @@ def hook_block_2bl(uc, address, size, user_data):
   for h in hooks_2bl:
     uc.hook_del(h)
 
+
+def hook_block_wrap(uc, address, size, user_data):
+  print("Tracing basic block at 0x%X, block size = 0x%X" %(address, size))
+  if address == 0:
+    dumped_wrap = uc.mem_read(0, 0x1000)
+    store("wrap.bin", dumped_wrap)
+
+
 hooks_kernel = []
 def hook_block_kernel(uc, address, size, user_data):
   print("Tracing basic block at 0x%X, block size = 0x%X" %(address, size))
@@ -363,6 +371,9 @@ def extract_bios():
     # Trace basic blocks in kernel region 
     global hooks_kernel
     hooks_kernel += [uc.hook_add(UC_HOOK_BLOCK, hook_block_kernel, begin=0x80010000, end=0x80000000 + xbox.ram_size - 1)]
+
+    # Trace basic blocks for wrap-around
+    uc.hook_add(UC_HOOK_BLOCK, hook_block_wrap, begin=0x0, end=0x1000)
 
     #FIXME: Find a way to dump x-codes?
     #       Possibly by looking at basic blocks in x-code interpreter
